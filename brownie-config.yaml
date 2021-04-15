@@ -1,0 +1,13 @@
+networks:
+  default: development
+  development:
+    cmd: ganache-cli
+    host: http://127.0.0.1
+    timeout: 120
+    cmd_settings:
+      port: 8545
+      gas_limit: 12000000
+      accounts: 10
+      evm_version: istanbul
+      mnemonic: brownie
+      fork: http://localhost:9545
