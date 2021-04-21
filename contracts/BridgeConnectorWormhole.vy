@@ -46,6 +46,7 @@ def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[10
 
 
 @external
+@view
 def adjust_amount(_amount: uint256, _decimals: uint256) -> uint256:
     # Wormhole only supports the precision of 9 decimals
     mult: uint256 = 10 ** (_decimals - 9)
