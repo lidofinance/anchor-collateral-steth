@@ -35,7 +35,7 @@ bridge_connector: public(address)
 rewards_liquidator: public(address)
 liquidations_admin: public(address)
 last_liquidation_time: public(uint256)
-last_liquidation_steth_balance: public(uint256)
+liquidation_base_balance: public(uint256)
 
 
 @external
@@ -80,11 +80,13 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
 
     beth_rate: uint256 = self._get_rate(False)
     beth_amount: uint256 = (_amount * beth_rate) / 10**18
-    # bridge might not support arbitrary full precision amounts
+    # the bridge might not support full precision amounts
     beth_amount = BridgeConnector(connector).adjust_amount(beth_amount, BETH_DECIMALS)
 
     steth_amount_adj: uint256 = (beth_amount * 10**18) / beth_rate
     assert steth_amount_adj <= _amount
+
+    self.liquidation_base_balance = self.liquidation_base_balance + steth_amount_adj
 
     ERC20(STETH_TOKEN).transferFrom(msg.sender, self, steth_amount_adj)
     Mintable(BETH_TOKEN).mint(connector, beth_amount)
@@ -94,8 +96,12 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
 @external
 def withdraw(_amount: uint256, _recipient: address = msg.sender):
     Mintable(BETH_TOKEN).burn(msg.sender, _amount)
+
     steth_rate: uint256 = self._get_rate(True)
     steth_amount: uint256 = (_amount * steth_rate) / 10**18
+
+    self.liquidation_base_balance = self.liquidation_base_balance - steth_amount
+
     ERC20(STETH_TOKEN).transfer(_recipient, steth_amount)
 
 
@@ -109,18 +115,18 @@ def collect_rewards() -> uint256:
         assert time_since_last_liquidation > RESTRICTED_LIQUIDATION_INTERVAL
 
     steth_balance: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
-    last_steth_balance: uint256 = self.last_liquidation_steth_balance
+    steth_base_balance: uint256 = self.liquidation_base_balance
 
-    self.last_liquidation_steth_balance = last_steth_balance
+    self.liquidation_base_balance = steth_balance
     self.last_liquidation_time = block.timestamp
 
-    if steth_balance <= last_steth_balance:
+    if steth_balance <= steth_base_balance:
         return 0
 
     connector: address = self.bridge_connector
     liquidator: address = self.rewards_liquidator
 
-    ERC20(STETH_TOKEN).transfer(liquidator, steth_balance - last_steth_balance)
+    ERC20(STETH_TOKEN).transfer(liquidator, steth_balance - steth_base_balance)
     ust_amount: uint256 = RewardsLiquidator(liquidator).liquidate(connector)
     BridgeConnector(connector).forward_ust(ANCHOR_REWARDS_DISTRIBUTOR, ust_amount, b"")
 
