@@ -19,6 +19,22 @@ interface Mintable:
     def burn(owner: address, amount: uint256): nonpayable
 
 
+event Deposited:
+    sender: indexed(address)
+    amount: uint256
+    terra_address: bytes32
+
+
+event Withdrawn:
+    recipient: indexed(address)
+    amount: uint256
+
+
+event RewardsCollected:
+    steth_amount: uint256
+    ust_amount: uint256
+
+
 # FIXME: use the actual address
 BETH_TOKEN: constant(address) = ZERO_ADDRESS
 BETH_DECIMALS: constant(uint256) = 18
@@ -92,6 +108,8 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
     Mintable(BETH_TOKEN).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
 
+    log Deposited(msg.sender, _amount, _terra_address)
+
 
 @external
 def withdraw(_amount: uint256, _recipient: address = msg.sender):
@@ -103,6 +121,8 @@ def withdraw(_amount: uint256, _recipient: address = msg.sender):
     self.liquidation_base_balance = self.liquidation_base_balance - steth_amount
 
     ERC20(STETH_TOKEN).transfer(_recipient, steth_amount)
+
+    log Withdrawn(_recipient, _amount)
 
 
 @external
@@ -121,13 +141,18 @@ def collect_rewards() -> uint256:
     self.last_liquidation_time = block.timestamp
 
     if steth_balance <= steth_base_balance:
+        log RewardsCollected(0, 0)
         return 0
 
     connector: address = self.bridge_connector
     liquidator: address = self.rewards_liquidator
 
-    ERC20(STETH_TOKEN).transfer(liquidator, steth_balance - steth_base_balance)
+    steth_amount: uint256 = steth_balance - steth_base_balance
+
+    ERC20(STETH_TOKEN).transfer(liquidator, steth_amount)
     ust_amount: uint256 = RewardsLiquidator(liquidator).liquidate(connector)
     BridgeConnector(connector).forward_ust(ANCHOR_REWARDS_DISTRIBUTOR, ust_amount, b"")
+
+    log RewardsCollected(steth_amount, ust_amount)
 
     return ust_amount
