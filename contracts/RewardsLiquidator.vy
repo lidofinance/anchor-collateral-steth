@@ -1,4 +1,4 @@
-# @version 0.2.11
+# @version 0.2.12
 # @author skozin <info@lido.fi>
 # @licence MIT
 from vyper.interfaces import ERC20
