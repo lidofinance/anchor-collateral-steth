@@ -121,7 +121,7 @@ def _get_eth_anchor_price() -> uint256:
     (round_id, answer, started_at, updated_at, answered_in_round) = \
         ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USD_FEED).latestRoundData()
 
-    assert answered_in_round != 0
+    assert updated_at != 0
 
     return convert(answer, uint256) * (10 ** (18 - eth_price_decimals))
 
