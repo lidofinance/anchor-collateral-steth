@@ -9,7 +9,6 @@ event Test__Forwarded:
     extra_data: Bytes[1024]
 
 
-SINKHOLE: constant(address) = 0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 
 beth_token: address
@@ -24,13 +23,13 @@ def __init__(beth_token: address, bridge: address):
 
 @external
 def forward_beth(terra_address: bytes32, amount: uint256, extra_data: Bytes[1024]):
-    ERC20(self.beth_token).transfer(SINKHOLE, amount)
+    ERC20(self.beth_token).transfer(self.bridge, amount)
     log Test__Forwarded("bETH", terra_address, amount, extra_data)
 
 
 @external
 def forward_ust(terra_address: bytes32, amount: uint256, extra_data: Bytes[1024]):
-    ERC20(UST_TOKEN).transfer(SINKHOLE, amount)
+    ERC20(UST_TOKEN).transfer(self.bridge, amount)
     log Test__Forwarded("UST", terra_address, amount, extra_data)
 
 
