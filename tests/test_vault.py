@@ -1,5 +1,5 @@
 import pytest
-from brownie import ZERO_ADDRESS, chain, reverts
+from brownie import ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
 
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -136,8 +136,42 @@ def test_configuration(vault, stranger, admin, helpers):
     
     tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": admin})
 
-    helpers.assert_single_event_named('Configurated', tx, source=vault, evt_keys_dict={
-        'bridge_connector': ZERO_ADDRESS,
-        'rewards_liquidator': ZERO_ADDRESS,
+    helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={
+        'bridge_connector': ZERO_ADDRESS
+    })
+    helpers.assert_single_event_named('RewardsLiquidatorUpdated', tx, source=vault, evt_keys_dict={
+        'rewards_liquidator': ZERO_ADDRESS
+    })
+    helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
         'liquidations_admin': ZERO_ADDRESS
+    })
+
+
+def test_set_bridge_connector(vault, stranger, admin, helpers):
+    with reverts():
+        vault.set_bridge_connector(ETH_ADDRESS, {"from": stranger})
+
+    tx = vault.set_bridge_connector(ETH_ADDRESS, {"from": admin})
+    helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={
+        'bridge_connector': ETH_ADDRESS
+    })
+
+
+def test_set_rewards_liquidator(vault, stranger, admin, helpers):
+    with reverts():
+        vault.set_rewards_liquidator(ETH_ADDRESS, {"from": stranger})
+
+    tx = vault.set_rewards_liquidator(ETH_ADDRESS, {"from": admin})
+    helpers.assert_single_event_named('RewardsLiquidatorUpdated', tx, source=vault, evt_keys_dict={
+        'rewards_liquidator': ETH_ADDRESS
+    })
+
+
+def test_set_liquidations_admin(vault, stranger, admin, helpers):
+    with reverts():
+        vault.set_liquidations_admin(ETH_ADDRESS, {"from": stranger})
+
+    tx = vault.set_liquidations_admin(ETH_ADDRESS, {"from": admin})
+    helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
+        'liquidations_admin': ETH_ADDRESS
     })

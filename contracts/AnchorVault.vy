@@ -39,9 +39,15 @@ event AdminChanged:
     new_admin: address
 
 
-event Configurated:
+event BridgeConnectorUpdated:
     bridge_connector: address
+
+
+event RewardsLiquidatorUpdated:
     rewards_liquidator: address
+
+
+event LiquidationsAdminUpdated:
     liquidations_admin: address
 
 
@@ -79,6 +85,42 @@ def change_admin(new_admin: address):
     log AdminChanged(new_admin)
 
 
+@internal
+def _set_bridge_connector(_bridge_connector: address):
+    self.bridge_connector = _bridge_connector
+    log BridgeConnectorUpdated(self.bridge_connector)
+
+
+@external
+def set_bridge_connector(_bridge_connector: address):
+    assert msg.sender == self.admin
+    self._set_bridge_connector(_bridge_connector)
+
+
+@internal
+def _set_rewards_liquidator(_rewards_liquidator: address):
+    self.rewards_liquidator = _rewards_liquidator
+    log RewardsLiquidatorUpdated(self.rewards_liquidator)
+
+
+@external
+def set_rewards_liquidator(_rewards_liquidator: address):
+    assert msg.sender == self.admin
+    self._set_rewards_liquidator(_rewards_liquidator)
+
+
+@internal
+def _set_liquidations_admin(_liquidations_admin: address):
+    self.liquidations_admin = _liquidations_admin
+    log LiquidationsAdminUpdated(self.liquidations_admin)
+
+
+@external
+def set_liquidations_admin(_liquidations_admin: address):
+    assert msg.sender == self.admin
+    self._set_liquidations_admin(_liquidations_admin)
+
+
 @external
 def configure(
     _bridge_connector: address,
@@ -86,11 +128,9 @@ def configure(
     _liquidations_admin: address,
 ):
     assert msg.sender == self.admin
-    self.bridge_connector = _bridge_connector
-    self.rewards_liquidator = _rewards_liquidator
-    self.liquidations_admin = _liquidations_admin
-
-    log Configurated(self.bridge_connector, self.rewards_liquidator, self.liquidations_admin)
+    self._set_bridge_connector(_bridge_connector)
+    self._set_rewards_liquidator(_rewards_liquidator)
+    self._set_liquidations_admin(_liquidations_admin)
 
 
 @internal
