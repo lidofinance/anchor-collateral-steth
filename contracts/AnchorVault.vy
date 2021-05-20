@@ -149,6 +149,16 @@ def _get_rate(_is_withdraw_rate: bool) -> uint256:
 
 
 @external
+@view
+def get_rate() -> uint256:
+    """
+    @dev How much bETH one receives for depositing one stETH, and how much bETH one needs
+         to provide to withdraw one stETH, 10**18 being the 1:1 rate.
+    """
+    return self._get_rate(False)
+
+
+@external
 def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
     connector: address = self.bridge_connector
 
