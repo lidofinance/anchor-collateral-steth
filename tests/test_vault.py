@@ -1,6 +1,5 @@
 import pytest
-from brownie import chain, reverts
-from helpers import equal_with_epsilon
+from brownie import ZERO_ADDRESS, chain, reverts
 
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -98,7 +97,7 @@ def test_withdraw(vault, vault_user, steth_token, beth_token, withdraw_from_terr
     assert beth_token.balanceOf(vault_user) == amount
     tx = vault.withdraw(amount, {'from': vault_user})
 
-    assert equal_with_epsilon(steth_token.balanceOf(vault_user), steth_balance_before)
+    assert helpers.equal_with_precision(steth_token.balanceOf(vault_user), steth_balance_before, 10)
 
     helpers.assert_single_event_named('Withdrawn', tx, source=vault, evt_keys_dict={
         'recipient': vault_user,
@@ -118,3 +117,27 @@ def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from
 
     with reverts():
         vault.withdraw(amount + 1, {'from': vault_user})
+
+
+def test_change_admin(vault, stranger, admin, helpers):
+    with reverts():
+        vault.change_admin(stranger, {"from": stranger})
+
+    tx = vault.change_admin(stranger, {"from": admin})
+
+    helpers.assert_single_event_named('AdminChanged', tx, source=vault, evt_keys_dict={
+        'new_admin': stranger
+    })
+
+
+def test_configuration(vault, stranger, admin, helpers):
+    with reverts():
+        vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": stranger})
+    
+    tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": admin})
+
+    helpers.assert_single_event_named('Configurated', tx, source=vault, evt_keys_dict={
+        'bridge_connector': ZERO_ADDRESS,
+        'rewards_liquidator': ZERO_ADDRESS,
+        'liquidations_admin': ZERO_ADDRESS
+    })

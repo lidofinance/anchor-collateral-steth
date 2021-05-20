@@ -35,6 +35,16 @@ event RewardsCollected:
     ust_amount: uint256
 
 
+event AdminChanged:
+    new_admin: address
+
+
+event Configurated:
+    bridge_connector: address
+    rewards_liquidator: address
+    liquidations_admin: address
+
+
 BETH_DECIMALS: constant(uint256) = 18
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
 ANCHOR_REWARDS_DISTRIBUTOR: constant(bytes32) = 0x0000000000000000000000000000000000000000000000000000000000000000
@@ -59,12 +69,14 @@ liquidation_base_balance: public(uint256)
 def __init__(beth_token: address, admin: address):
     self.beth_token = beth_token
     self.admin = admin
+    log AdminChanged(admin)
 
 
 @external
 def change_admin(new_admin: address):
     assert msg.sender == self.admin
     self.admin = new_admin
+    log AdminChanged(new_admin)
 
 
 @external
@@ -77,6 +89,8 @@ def configure(
     self.bridge_connector = _bridge_connector
     self.rewards_liquidator = _rewards_liquidator
     self.liquidations_admin = _liquidations_admin
+
+    log Configurated(self.bridge_connector, self.rewards_liquidator, self.liquidations_admin)
 
 
 @internal
