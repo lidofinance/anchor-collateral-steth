@@ -54,6 +54,7 @@ def test_initial_config_correct(
 def test_deposit(vault, vault_user, steth_token, beth_token, mock_bridge_connector, helpers):
     amount = 1 * 10**18
     steth_balance_before = steth_token.balanceOf(vault_user)
+    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
 
     steth_token.approve(vault, amount, {'from': vault_user})
     tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
@@ -73,11 +74,13 @@ def test_deposit(vault, vault_user, steth_token, beth_token, mock_bridge_connect
 
     assert beth_token.balanceOf(vault_user) == 0
 
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + amount
+
     steth_balance_decrease = steth_balance_before - steth_token.balanceOf(vault_user)
     assert helpers.equal_with_precision(steth_balance_decrease, amount, max_diff=1)
 
 
-def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_from_terra):
+def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_from_terra, mock_bridge_connector):
     amount = 1 * 10**18
 
     steth_balance_before = steth_token.balanceOf(vault_user)
@@ -85,9 +88,13 @@ def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_
     steth_token.approve(vault, amount, {'from': vault_user})
     vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
 
+    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
+
     withdraw_from_terra(TERRA_ADDRESS, vault_user, amount)
 
     assert beth_token.balanceOf(vault_user) == amount
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before - amount
+
     tx = vault.withdraw(amount, {'from': vault_user})
 
     assert helpers.equal_with_precision(steth_token.balanceOf(vault_user), steth_balance_before, 10)

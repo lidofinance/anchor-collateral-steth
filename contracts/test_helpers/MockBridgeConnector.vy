@@ -8,11 +8,6 @@ event Test__Forwarded:
     amount: uint256
     extra_data: Bytes[1024]
 
-event Test__TerraWithdraw:
-    terra_address: bytes32
-    recepient: address
-    amount: uint256
-    terra_balance: uint256
 
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 
@@ -55,4 +50,8 @@ def mock_beth_withdraw(terra_address: bytes32, recepient: address, amount: uint2
     ERC20(self.beth_token).transferFrom(self.bridge, recepient, amount)
     self.terra_beth_balances[terra_address] -= amount
 
-    log Test__TerraWithdraw(terra_address, recepient, amount, self.terra_beth_balances[terra_address])
+
+@external
+@view
+def terra_beth_balance_of(terra_address: bytes32) -> uint256:
+    return self.terra_beth_balances[terra_address]

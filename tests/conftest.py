@@ -63,10 +63,9 @@ def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeCo
 
 @pytest.fixture(scope='function')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
-  def withdraw(TERRA_ADDRESS, to_address, amount):
+  def withdraw(terra_address, to_address, amount):
     beth_token.approve(mock_bridge_connector, amount, {"from": mock_bridge})
-    tx = mock_bridge_connector.mock_beth_withdraw(TERRA_ADDRESS, to_address, amount, {"from": mock_bridge})
-    print(tx.events['Test__TerraWithdraw'])
+    tx = mock_bridge_connector.mock_beth_withdraw(terra_address, to_address, amount, {"from": mock_bridge})
   return withdraw
 
 
