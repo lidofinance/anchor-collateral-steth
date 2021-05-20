@@ -51,6 +51,13 @@ def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
 
 
+@pytest.fixture(scope='function')
+def withdraw_from_terra(mock_bridge, beth_token):
+  def withdraw(to_address, amount):
+    beth_token.transfer(to_address, amount, {'from': mock_bridge})
+  return withdraw
+
+
 class Helpers:
     @staticmethod
     def filter_events_from(addr, events):

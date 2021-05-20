@@ -19,12 +19,6 @@ def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeCo
 @pytest.fixture(scope='function')
 def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
     return MockRewardsLiquidator.deploy({'from': deployer})
-    
-@pytest.fixture(scope='function')
-def withdraw_from_terra(mock_bridge, beth_token):
-  def withdraw(to_address, amount):
-    beth_token.transfer(to_address, amount, {'from': mock_bridge})
-  return withdraw
 
 
 @pytest.fixture(scope='function')
@@ -112,7 +106,7 @@ def test_withdraw(vault, vault_user, steth_token, beth_token, withdraw_from_terr
     })
 
 
-def test_withdraw_fails_on_balance(vault, vault_user, steth_token, beth_token, mock_bridge_connector, helpers, admin):
+def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from_terra):
     amount = 1 * 10**18
 
     steth_balance_before = steth_token.balanceOf(vault_user)
