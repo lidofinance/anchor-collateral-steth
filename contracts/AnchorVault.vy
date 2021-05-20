@@ -181,13 +181,12 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
 
 @external
 def withdraw(_amount: uint256, _recipient: address = msg.sender):
-    Mintable(self.beth_token).burn(msg.sender, _amount)
-
     steth_rate: uint256 = self._get_rate(True)
     steth_amount: uint256 = (_amount * steth_rate) / 10**18
 
     self.liquidation_base_balance = self.liquidation_base_balance - steth_amount
 
+    Mintable(self.beth_token).burn(msg.sender, _amount)
     ERC20(STETH_TOKEN).transfer(_recipient, steth_amount)
 
     log Withdrawn(_recipient, _amount)
