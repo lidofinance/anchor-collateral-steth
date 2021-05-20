@@ -176,7 +176,7 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
     Mintable(self.beth_token).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
 
-    log Deposited(msg.sender, _amount, _terra_address)
+    log Deposited(msg.sender, steth_amount_adj, _terra_address)
 
 
 @external

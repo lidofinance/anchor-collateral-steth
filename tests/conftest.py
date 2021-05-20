@@ -2,6 +2,9 @@ import pytest
 from brownie import ZERO_ADDRESS
 
 
+BETH_DECIMALS = 18
+
+
 @pytest.fixture(scope='function', autouse=True)
 def shared_setup(fn_isolation):
     pass
@@ -25,6 +28,15 @@ def liquidations_admin(accounts):
 @pytest.fixture(scope='module')
 def vault_user(accounts, interface, steth_token):
     user = accounts[3]
+    lido = interface.Lido(steth_token.address)
+    lido.submit(ZERO_ADDRESS, {'from': user, 'value': 99 * 10**18})
+    assert steth_token.balanceOf(user) > 98 * 10**18
+    return user
+
+
+@pytest.fixture(scope='module')
+def another_vault_user(accounts, interface, steth_token):
+    user = accounts[4]
     lido = interface.Lido(steth_token.address)
     lido.submit(ZERO_ADDRESS, {'from': user, 'value': 99 * 10**18})
     assert steth_token.balanceOf(user) > 98 * 10**18
@@ -69,8 +81,10 @@ def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
 @pytest.fixture(scope='function')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
   def withdraw(terra_address, to_address, amount):
+    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
     beth_token.approve(mock_bridge_connector, amount, {"from": mock_bridge})
-    tx = mock_bridge_connector.mock_beth_withdraw(terra_address, to_address, amount, {"from": mock_bridge})
+    mock_bridge_connector.mock_beth_withdraw(terra_address, to_address, amount, {"from": mock_bridge})
+    assert mock_bridge_connector.terra_beth_balance_of(terra_address) == terra_balance_before - amount
   return withdraw
 
 
@@ -88,6 +102,36 @@ def rebase_steth_by(interface, accounts, steth_token):
         assert beacon_balance > 0
         lido.pushBeacon(beacon_validators, beacon_balance, {'from': lido_oracle})
     return rebase
+
+
+@pytest.fixture(scope="function")
+def steth_adjusted_ammount(vault, mock_bridge_connector):
+    def adjust_amount(amount):
+        beth_rate = vault.get_rate()
+        beth_amount = (amount * beth_rate) / 10**18
+        beth_amount = mock_bridge_connector.adjust_amount(beth_amount, BETH_DECIMALS)
+        steth_amount_adj = (beth_amount * 10**18) / beth_rate
+        return steth_amount_adj
+    return adjust_amount
+
+
+@pytest.fixture(scope='function')
+def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_adjusted_ammount):
+    def deposit(terra_address, sender, amount):
+        terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
+        steth_balance_before = steth_token.balanceOf(sender)
+
+        steth_token.approve(vault, amount, {'from': sender})
+        tx = vault.submit(amount, terra_address, '0xab', {'from': sender})
+
+        steth_amount_adj = steth_adjusted_ammount(amount)
+
+        steth_balance_decrease = steth_balance_before - steth_token.balanceOf(sender)
+        assert helpers.equal_with_precision(steth_balance_decrease, steth_amount_adj, max_diff=10)
+        assert mock_bridge_connector.terra_beth_balance_of(terra_address) == terra_balance_before + steth_amount_adj
+
+        return tx
+    return deposit
 
 
 class Helpers:

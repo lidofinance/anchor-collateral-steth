@@ -12,16 +12,14 @@ def test_steth_positive_rebase(
     vault_user,
     stranger,
     steth_token,
-    mock_bridge_connector,
+    deposit_to_terra,
     withdraw_from_terra,
     rebase_steth_by,
     helpers
 ):
     amount = 1 * 10**18
 
-    steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == amount
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
     assert helpers.equal_with_precision(vault_steth_balance_before, amount, 10)
@@ -44,16 +42,14 @@ def test_steth_negative_rebase(
     vault_user,
     stranger,
     steth_token,
-    mock_bridge_connector,
+    deposit_to_terra,
     withdraw_from_terra,
     rebase_steth_by,
     helpers
 ):
     amount = 1 * 10**18
 
-    steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == amount
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
     assert helpers.equal_with_precision(vault_steth_balance_before, amount, 10)
@@ -71,3 +67,4 @@ def test_steth_negative_rebase(
     vault.withdraw(amount, {'from': stranger})
 
     assert helpers.equal_with_precision(steth_token.balanceOf(stranger), int(amount * 0.99), 10)
+

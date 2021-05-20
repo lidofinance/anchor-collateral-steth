@@ -3,6 +3,7 @@ from brownie import ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
 
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+BETH_DECIMALS = 18
 
 
 @pytest.fixture(scope='function')
@@ -42,43 +43,53 @@ def test_initial_config_correct(
     assert vault.last_liquidation_time() == 0
     assert vault.liquidation_base_balance() == 0
 
+@pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
+def test_deposit(
+    vault, 
+    vault_user, 
+    beth_token, 
+    mock_bridge_connector, 
+    helpers, 
+    deposit_to_terra, 
+    amount, 
+    steth_adjusted_ammount
+):
 
-def test_deposit(vault, vault_user, steth_token, beth_token, mock_bridge_connector, helpers):
-    amount = 1 * 10**18
-    steth_balance_before = steth_token.balanceOf(vault_user)
-    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
+    tx = deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
 
-    steth_token.approve(vault, amount, {'from': vault_user})
-    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    adjusted_amount = steth_adjusted_ammount(amount)
 
     helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
         'sender': vault_user,
-        'amount': amount,
+        'amount': adjusted_amount,
         'terra_address': TERRA_ADDRESS
     })
 
     helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
         'asset_name': 'bETH',
         'terra_address': TERRA_ADDRESS,
-        'amount': amount,
+        'amount': adjusted_amount,
         'extra_data': '0xab'
     })
 
     assert beth_token.balanceOf(vault_user) == 0
 
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + amount
 
-    steth_balance_decrease = steth_balance_before - steth_token.balanceOf(vault_user)
-    assert helpers.equal_with_precision(steth_balance_decrease, amount, max_diff=1)
-
-
-def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_from_terra, mock_bridge_connector):
+def test_withdraw(
+    vault, 
+    vault_user, 
+    steth_token, 
+    beth_token, 
+    helpers, 
+    withdraw_from_terra, 
+    mock_bridge_connector, 
+    deposit_to_terra
+):
     amount = 1 * 10**18
 
     steth_balance_before = steth_token.balanceOf(vault_user)
 
-    steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
 
     terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
 
@@ -97,13 +108,12 @@ def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_
     })
 
 
-def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from_terra):
+def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from_terra, deposit_to_terra):
     amount = 1 * 10**18
 
     steth_balance_before = steth_token.balanceOf(vault_user)
 
-    steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
 
     withdraw_from_terra(TERRA_ADDRESS, vault_user, amount)
 
@@ -167,3 +177,4 @@ def test_set_liquidations_admin(vault, stranger, admin, helpers):
     helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
         'liquidations_admin': ETH_ADDRESS
     })
+
