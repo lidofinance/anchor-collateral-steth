@@ -5,14 +5,6 @@ from brownie import ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
 
-
-
-
-@pytest.fixture(scope='function')
-def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
-    return MockRewardsLiquidator.deploy({'from': deployer})
-
-
 @pytest.fixture(scope='function')
 def vault(
     beth_token,
@@ -133,7 +125,7 @@ def test_change_admin(vault, stranger, admin, helpers):
 def test_configuration(vault, stranger, admin, helpers):
     with reverts():
         vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": stranger})
-    
+
     tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": admin})
 
     helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={

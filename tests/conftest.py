@@ -62,11 +62,32 @@ def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeCo
 
 
 @pytest.fixture(scope='function')
+def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
+    return MockRewardsLiquidator.deploy({'from': deployer})
+
+
+@pytest.fixture(scope='function')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
   def withdraw(terra_address, to_address, amount):
     beth_token.approve(mock_bridge_connector, amount, {"from": mock_bridge})
     tx = mock_bridge_connector.mock_beth_withdraw(terra_address, to_address, amount, {"from": mock_bridge})
   return withdraw
+
+
+@pytest.fixture(scope='module')
+def rebase_steth_by(interface, accounts, steth_token):
+    lido = interface.Lido(steth_token.address)
+    lido_oracle = accounts.at(lido.getOracle(), force=True)
+    dao_voting = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
+    def rebase(mult):
+        lido.setFee(0, {'from': dao_voting})
+        (deposited_validators, beacon_validators, beacon_balance) = lido.getBeaconStat()
+        total_supply = steth_token.totalSupply()
+        total_supply_inc = (mult - 1) * total_supply
+        beacon_balance += total_supply_inc
+        assert beacon_balance > 0
+        lido.pushBeacon(beacon_validators, beacon_balance, {'from': lido_oracle})
+    return rebase
 
 
 class Helpers:
