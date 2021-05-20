@@ -51,10 +51,22 @@ def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
 
 
+@pytest.fixture(scope='module')
+def mock_bridge(accounts):
+    return accounts.add()
+
+
 @pytest.fixture(scope='function')
-def withdraw_from_terra(mock_bridge, beth_token):
-  def withdraw(to_address, amount):
-    beth_token.transfer(to_address, amount, {'from': mock_bridge})
+def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeConnector):
+    return MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
+
+
+@pytest.fixture(scope='function')
+def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
+  def withdraw(TERRA_ADDRESS, to_address, amount):
+    beth_token.approve(mock_bridge_connector, amount, {"from": mock_bridge})
+    tx = mock_bridge_connector.mock_beth_withdraw(TERRA_ADDRESS, to_address, amount, {"from": mock_bridge})
+    print(tx.events['Test__TerraWithdraw'])
   return withdraw
 
 

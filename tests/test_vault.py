@@ -5,14 +5,7 @@ from brownie import ZERO_ADDRESS, chain, reverts
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 
 
-@pytest.fixture(scope='module')
-def mock_bridge(accounts):
-    return accounts.add()
 
-
-@pytest.fixture(scope='function')
-def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeConnector):
-    return MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
 
 
 @pytest.fixture(scope='function')
@@ -84,7 +77,7 @@ def test_deposit(vault, vault_user, steth_token, beth_token, mock_bridge_connect
     assert helpers.equal_with_precision(steth_balance_decrease, amount, max_diff=1)
 
 
-def test_withdraw(vault, vault_user, steth_token, beth_token, withdraw_from_terra, helpers):
+def test_withdraw(vault, vault_user, steth_token, beth_token, helpers, withdraw_from_terra):
     amount = 1 * 10**18
 
     steth_balance_before = steth_token.balanceOf(vault_user)
@@ -92,7 +85,7 @@ def test_withdraw(vault, vault_user, steth_token, beth_token, withdraw_from_terr
     steth_token.approve(vault, amount, {'from': vault_user})
     vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
 
-    withdraw_from_terra(vault_user, amount)
+    withdraw_from_terra(TERRA_ADDRESS, vault_user, amount)
 
     assert beth_token.balanceOf(vault_user) == amount
     tx = vault.withdraw(amount, {'from': vault_user})
@@ -113,7 +106,7 @@ def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from
     steth_token.approve(vault, amount, {'from': vault_user})
     vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
 
-    withdraw_from_terra(vault_user, amount)
+    withdraw_from_terra(TERRA_ADDRESS, vault_user, amount)
 
     with reverts():
         vault.withdraw(amount + 1, {'from': vault_user})
