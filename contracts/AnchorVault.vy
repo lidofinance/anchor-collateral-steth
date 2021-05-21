@@ -19,6 +19,11 @@ interface Mintable:
     def burn(owner: address, amount: uint256): nonpayable
 
 
+interface Lido:
+    def sharesOf(owner: address) -> uint256: view
+    def getPooledEthByShares(shares_amount: uint256) -> uint256: view
+
+
 event Deposited:
     sender: indexed(address)
     amount: uint256
@@ -68,7 +73,8 @@ rewards_liquidator: public(address)
 
 liquidations_admin: public(address)
 last_liquidation_time: public(uint256)
-liquidation_base_balance: public(uint256)
+last_liquidation_shares_balance: public(uint256)
+last_liquidation_steth_balance: public(uint256)
 
 
 @external
@@ -170,8 +176,6 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
     steth_amount_adj: uint256 = (beth_amount * 10**18) / beth_rate
     assert steth_amount_adj <= _amount
 
-    self.liquidation_base_balance = self.liquidation_base_balance + steth_amount_adj
-
     ERC20(STETH_TOKEN).transferFrom(msg.sender, self, steth_amount_adj)
     Mintable(self.beth_token).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
@@ -183,8 +187,6 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
 def withdraw(_amount: uint256, _recipient: address = msg.sender):
     steth_rate: uint256 = self._get_rate(True)
     steth_amount: uint256 = (_amount * steth_rate) / 10**18
-
-    self.liquidation_base_balance = self.liquidation_base_balance - steth_amount
 
     Mintable(self.beth_token).burn(msg.sender, _amount)
     ERC20(STETH_TOKEN).transfer(_recipient, steth_amount)
@@ -201,25 +203,44 @@ def collect_rewards() -> uint256:
     else:
         assert time_since_last_liquidation > RESTRICTED_LIQUIDATION_INTERVAL
 
-    steth_balance: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
-    steth_base_balance: uint256 = self.liquidation_base_balance
+    shares_balance: uint256 = Lido(STETH_TOKEN).sharesOf(self)
+    last_liquidation_shares_balance: uint256 = self.last_liquidation_shares_balance
 
-    self.liquidation_base_balance = steth_balance
-    self.last_liquidation_time = block.timestamp
+    non_reward_balance_change: int256 = 0
+
+    if shares_balance >= last_liquidation_shares_balance:
+        non_reward_balance_change = convert(Lido(STETH_TOKEN).getPooledEthByShares(
+            shares_balance - last_liquidation_shares_balance
+        ), int256)
+    else:
+        non_reward_balance_change = -1 * convert(Lido(STETH_TOKEN).getPooledEthByShares(
+            last_liquidation_shares_balance - shares_balance
+        ), int256)
+
+    steth_balance: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
+
+    # -non_reward_balance_change cannot be greater than self.last_liquidation_steth_balance
+    steth_base_balance: uint256 = convert(
+        convert(self.last_liquidation_steth_balance, int256) + non_reward_balance_change,
+        uint256
+    )
+
+    self.last_liquidation_shares_balance = shares_balance
+    self.last_liquidation_steth_balance = steth_balance
 
     if steth_balance <= steth_base_balance:
         log RewardsCollected(0, 0)
         return 0
 
+    steth_to_sell: uint256 = steth_balance - steth_base_balance
+
     connector: address = self.bridge_connector
     liquidator: address = self.rewards_liquidator
 
-    steth_amount: uint256 = steth_balance - steth_base_balance
-
-    ERC20(STETH_TOKEN).transfer(liquidator, steth_amount)
+    ERC20(STETH_TOKEN).transfer(liquidator, steth_to_sell)
     ust_amount: uint256 = RewardsLiquidator(liquidator).liquidate(connector)
     BridgeConnector(connector).forward_ust(ANCHOR_REWARDS_DISTRIBUTOR, ust_amount, b"")
 
-    log RewardsCollected(steth_amount, ust_amount)
+    log RewardsCollected(steth_to_sell, ust_amount)
 
     return ust_amount
