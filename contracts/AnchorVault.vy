@@ -227,6 +227,7 @@ def collect_rewards() -> uint256:
 
     self.last_liquidation_shares_balance = shares_balance
     self.last_liquidation_steth_balance = steth_balance
+    self.last_liquidation_time = block.timestamp
 
     if steth_balance <= steth_base_balance:
         log RewardsCollected(0, 0)
