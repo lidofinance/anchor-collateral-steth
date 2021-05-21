@@ -45,17 +45,20 @@ def test_initial_config_correct(
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
 def test_deposit(
-    vault, 
-    vault_user, 
-    beth_token, 
-    mock_bridge_connector, 
-    helpers, 
-    deposit_to_terra, 
-    amount, 
-    steth_adjusted_ammount
+    vault,
+    vault_user,
+    steth_token,
+    beth_token,
+    mock_bridge_connector,
+    helpers,
+    steth_adjusted_ammount,
+    amount
 ):
+    steth_balance_before = steth_token.balanceOf(vault_user)
+    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
 
-    tx = deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
+    steth_token.approve(vault, amount, {'from': vault_user})
+    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
 
     adjusted_amount = steth_adjusted_ammount(amount)
 
@@ -73,6 +76,11 @@ def test_deposit(
     })
 
     assert beth_token.balanceOf(vault_user) == 0
+
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + adjusted_amount
+
+    steth_balance_decrease = steth_balance_before - steth_token.balanceOf(vault_user)
+    assert helpers.equal_with_precision(steth_balance_decrease, adjusted_amount, max_diff=1)
 
 
 def test_withdraw(
