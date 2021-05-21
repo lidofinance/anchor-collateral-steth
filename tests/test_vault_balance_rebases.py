@@ -110,7 +110,7 @@ def test_steth_rewards_after_slashing(
     print('strander steth balance: ', steth_token.balanceOf(stranger))
     print(f'\n\nvault_user before {vault_user}\n amount:        {amount}\n steth_balance: {steth_token.balanceOf(vault_user)}\n beth balance:  {beth_token.balanceOf(vault_user)}\n terra_balance: {mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)}\n steth_vault:   {steth_token.balanceOf(vault)}\n beth connector:{beth_token.balanceOf(mock_bridge)}')
     withdraw_from_terra(TERRA_ADDRESS, to_address=stranger, amount=mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS))
-    vault.withdraw(amount, {'from': stranger})
+    vault.withdraw(beth_token.balanceOf(stranger), {'from': stranger})
     print(f'\n\nvault_user after {vault_user}\n amount:        {amount}\n steth_balance: {steth_token.balanceOf(vault_user)}\n beth balance:  {beth_token.balanceOf(vault_user)}\n terra_balance: {mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)}\n steth_vault:   {steth_token.balanceOf(vault)}\n beth connector:{beth_token.balanceOf(mock_bridge)}')
     
     print('strander steth balance: ', steth_token.balanceOf(stranger))
@@ -119,7 +119,7 @@ def test_steth_rewards_after_slashing(
 
     print(f'\n\nvault_user before {another_vault_user}\n amount:        {amount}\n steth_balance: {steth_token.balanceOf(another_vault_user)}\n beth balance:  {beth_token.balanceOf(another_vault_user)}\n terra_balance: {mock_bridge_connector.terra_beth_balance_of(ANOTHER_TERRA_ADDRESS)}\n steth_vault:   {steth_token.balanceOf(vault)}\n beth connector:{beth_token.balanceOf(mock_bridge)}')
     withdraw_from_terra(ANOTHER_TERRA_ADDRESS, to_address=stranger, amount=mock_bridge_connector.terra_beth_balance_of(ANOTHER_TERRA_ADDRESS))
-    vault.withdraw(amount, {'from': stranger})
+    vault.withdraw(beth_token.balanceOf(stranger), {'from': stranger})
     print(f'\n\nvault_user after {another_vault_user}\n amount:        {amount}\n steth_balance: {steth_token.balanceOf(another_vault_user)}\n beth balance:  {beth_token.balanceOf(another_vault_user)}\n terra_balance: {mock_bridge_connector.terra_beth_balance_of(ANOTHER_TERRA_ADDRESS)}\n steth_vault:   {steth_token.balanceOf(vault)}\n beth connector:{beth_token.balanceOf(mock_bridge)}')
 
     print('strander steth balance: ', steth_token.balanceOf(stranger))
