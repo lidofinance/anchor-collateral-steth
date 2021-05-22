@@ -75,12 +75,14 @@ liquidations_admin: public(address)
 last_liquidation_time: public(uint256)
 last_liquidation_shares_balance: public(uint256)
 last_liquidation_steth_balance: public(uint256)
+last_liquidation_shares_steth_rate: public(uint256)
 
 
 @external
 def __init__(beth_token: address, admin: address):
     self.beth_token = beth_token
     self.admin = admin
+    self.last_liquidation_shares_steth_rate = Lido(STETH_TOKEN).getPooledEthByShares(10**18)
     log AdminChanged(admin)
 
 
@@ -209,13 +211,15 @@ def collect_rewards() -> uint256:
     non_reward_balance_change: int256 = 0
 
     if shares_balance >= last_liquidation_shares_balance:
-        non_reward_balance_change = convert(Lido(STETH_TOKEN).getPooledEthByShares(
-            shares_balance - last_liquidation_shares_balance
-        ), int256)
+        non_reward_balance_change = convert(
+            (shares_balance - last_liquidation_shares_balance) * self.last_liquidation_shares_steth_rate / 10**18, 
+            int256
+        )
     else:
-        non_reward_balance_change = -1 * convert(Lido(STETH_TOKEN).getPooledEthByShares(
-            last_liquidation_shares_balance - shares_balance
-        ), int256)
+        non_reward_balance_change = -1 * convert(
+            (shares_balance - last_liquidation_shares_balance) * self.last_liquidation_shares_steth_rate / 10**18, 
+            int256
+        )
 
     steth_balance: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
 
@@ -228,6 +232,7 @@ def collect_rewards() -> uint256:
     self.last_liquidation_shares_balance = shares_balance
     self.last_liquidation_steth_balance = steth_balance
     self.last_liquidation_time = block.timestamp
+    self.last_liquidation_shares_steth_rate = Lido(STETH_TOKEN).getPooledEthByShares(10**18)
 
     if steth_balance <= steth_base_balance:
         log RewardsCollected(0, 0)
