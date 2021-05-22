@@ -3,6 +3,7 @@ from brownie import ZERO_ADDRESS
 
 
 BETH_DECIMALS = 18
+UST_TOKEN = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -54,6 +55,11 @@ def steth_token(interface):
 
 
 @pytest.fixture(scope='module')
+def lido(interface, steth_token):
+    return interface.Lido(steth_token.address)
+
+
+@pytest.fixture(scope='module')
 def ust_token(interface):
     return interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
 
@@ -69,8 +75,12 @@ def mock_bridge(accounts):
 
 
 @pytest.fixture(scope='function')
-def mock_bridge_connector(beth_token, deployer, admin, mock_bridge, MockBridgeConnector):
-    return MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
+def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector, interface):
+    mock_bridge_connector =  MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
+    ust_token = interface.ERC20(UST_TOKEN)
+    ust_balance = ust_token.balanceOf(UST_TOKEN)
+    interface.ERC20(UST_TOKEN).transfer(mock_bridge_connector.address, ust_balance, {"from": UST_TOKEN})
+    return mock_bridge_connector
 
 
 @pytest.fixture(scope='function')
@@ -121,15 +131,19 @@ def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_a
         terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
         steth_balance_before = steth_token.balanceOf(sender)
 
+        steth_amount_adj = steth_adjusted_ammount(amount)
+
         steth_token.approve(vault, amount, {'from': sender})
         tx = vault.submit(amount, terra_address, '0xab', {'from': sender})
 
-        steth_amount_adj = steth_adjusted_ammount(amount)
-
         steth_balance_decrease = steth_balance_before - steth_token.balanceOf(sender)
-        assert helpers.equal_with_precision(steth_balance_decrease, steth_amount_adj, max_diff=10)
-        assert mock_bridge_connector.terra_beth_balance_of(terra_address) == terra_balance_before + steth_amount_adj
-
+        beth_amount = steth_amount_adj * vault.get_rate() / 10**18
+        assert helpers.equal_with_precision(steth_balance_decrease, steth_amount_adj, max_diff=100)
+        assert helpers.equal_with_precision(
+            mock_bridge_connector.terra_beth_balance_of(terra_address),
+            terra_balance_before + beth_amount,
+            100
+        )
         return tx
     return deposit
 

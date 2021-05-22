@@ -31,6 +31,7 @@ def test_initial_config_correct(
     vault,
     admin,
     beth_token,
+    lido,
     mock_bridge_connector,
     mock_rewards_liquidator,
     liquidations_admin
@@ -41,7 +42,9 @@ def test_initial_config_correct(
     assert vault.rewards_liquidator() == mock_rewards_liquidator
     assert vault.liquidations_admin() == liquidations_admin
     assert vault.last_liquidation_time() == 0
-    assert vault.liquidation_base_balance() == 0
+    assert vault.last_liquidation_steth_balance() == 0
+    assert vault.last_liquidation_shares_balance() == 0
+    assert vault.last_liquidation_shares_steth_rate() == lido.getPooledEthByShares(10**18)
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
 def test_deposit(
