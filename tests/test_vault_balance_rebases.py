@@ -1,5 +1,6 @@
 import pytest
 from brownie.network.state import Chain
+from brownie import reverts
 
 from test_vault import vault
 
@@ -262,3 +263,32 @@ def test_steth_rewards_after_slashing_with_reward_collecting(
         adjusted_amount, 
         100
     )
+
+
+def test_shares_balance_decrease_liquidation(
+    vault, 
+    vault_user, 
+    deposit_to_terra,
+    steth_token,
+    beth_token,
+    rebase_steth_and_collect_rewards,
+    helpers,
+    withdraw_from_terra
+):
+    chain = Chain()
+
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount=10**18)
+
+    rebase_steth_and_collect_rewards(mult=1)
+
+    withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=0.5 * 10**18)
+    vault.withdraw(0.5 * 10**18, {'from': vault_user})
+    
+    chain.sleep(3600*28)
+    chain.mine()
+
+    vault_steth_balance_before = steth_token.balanceOf(vault)
+    vault_beth_balance_before = beth_token.balanceOf(vault)
+    rebase_steth_and_collect_rewards(mult=1.1)
+    assert beth_token.balanceOf(vault) == vault_beth_balance_before
+    assert helpers.equal_with_precision(steth_token.balanceOf(vault), vault_steth_balance_before, 100)

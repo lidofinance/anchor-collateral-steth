@@ -217,7 +217,7 @@ def collect_rewards() -> uint256:
         )
     else:
         non_reward_balance_change = -1 * convert(
-            (shares_balance - last_liquidation_shares_balance) * self.last_liquidation_shares_steth_rate / 10**18, 
+            (last_liquidation_shares_balance - shares_balance) * self.last_liquidation_shares_steth_rate / 10**18, 
             int256
         )
 
