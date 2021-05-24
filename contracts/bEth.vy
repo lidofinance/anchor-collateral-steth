@@ -18,6 +18,14 @@ event Approval:
     value: uint256
 
 
+event AdminChanged:
+    new_admin: address
+
+
+event MinterChanged:
+    new_minter: address
+
+
 name: public(String[26])
 symbol: public(String[7])
 decimals: public(uint256)
@@ -53,18 +61,22 @@ def __init__(_symbol: String[7], _minter: address, _admin: address):
     )
     self.minter = _minter
     self.admin = _admin
+    log AdminChanged(_admin)
+    log MinterChanged(_minter)
 
 
 @external
 def change_admin(new_admin: address):
     assert msg.sender == self.admin
     self.admin = new_admin
+    log AdminChanged(new_admin)
 
 
 @external
 def set_minter(new_minter: address):
     assert msg.sender == self.admin
     self.minter = new_minter
+    log MinterChanged(new_minter)
 
 
 @external
