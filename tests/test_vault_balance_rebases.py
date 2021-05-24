@@ -7,6 +7,7 @@ from test_vault import vault
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 ANOTHER_TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabca'
+ANCHOR_REWARDS_DISTRIBUTOR = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 # rebase steth and collect rewards will be called at the same time in one oracle callback transaction
 @pytest.fixture(scope="function")
@@ -136,6 +137,50 @@ def test_steth_rewards_after_slashing(
         steth_adjusted_ammount(adjusted_amount * positive_rebase_multiplier), 
         20
     )
+
+
+def test_collect_rewards_events(
+    vault,
+    vault_user,
+    rebase_steth_by,
+    liquidations_admin,
+    rebase_steth_and_collect_rewards,
+    deposit_to_terra,
+    withdraw_from_terra,
+    mock_bridge_connector,
+    beth_token,
+    helpers
+):
+    chain = Chain()
+    amount = 1 * 10**18
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount)
+    
+    rebase_steth_by(1)
+    tx = vault.collect_rewards({"from": liquidations_admin})
+
+    helpers.assert_single_event_named('RewardsCollected', tx, source=vault, evt_keys_dict={
+        'steth_amount': 0,
+        'ust_amount': 0
+    })
+
+    chain.sleep(3600*26)
+    chain.mine()
+
+    rebase_steth_by(1.1)
+    tx = vault.collect_rewards({"from": liquidations_admin})
+
+    rewardsCollectedEvent = tx.events['RewardsCollected'][0]
+    assert helpers.equal_with_precision(rewardsCollectedEvent['steth_amount'], 0.1 * 10**18, 200)
+    assert rewardsCollectedEvent['ust_amount'] == 42 * 10**18
+
+    helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
+        'asset_name': 'UST',
+        'terra_address': ANCHOR_REWARDS_DISTRIBUTOR,
+        'amount': 42 * 10**18,
+        'extra_data': '0x00'
+    })
+
+
 
 
 def test_steth_negative_rebase_and_rewards_collect(
