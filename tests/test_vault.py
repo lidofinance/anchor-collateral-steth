@@ -189,3 +189,18 @@ def test_set_liquidations_admin(vault, stranger, admin, helpers):
         'liquidations_admin': ETH_ADDRESS
     })
 
+
+def test_get_rate(vault, steth_token, beth_token, vault_user, helpers):
+
+    assert steth_token.balanceOf(vault) == 0
+    assert beth_token.balanceOf(vault) == 0
+    assert vault.get_rate() == 10**18
+
+    steth_token.transfer(vault, 2 * 10**18, {"from": vault_user})
+    assert steth_token.balanceOf(vault) > beth_token.balanceOf(vault)
+    assert vault.get_rate() == 10**18
+
+    beth_token.mint(vault, 4 * 10**18, {"from": vault})
+    assert helpers.equal_with_precision(2 * steth_token.balanceOf(vault), beth_token.balanceOf(vault), 10)
+    assert helpers.equal_with_precision(vault.get_rate(), 2 * 10**18, 10)
+    

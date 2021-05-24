@@ -265,6 +265,32 @@ def test_steth_rewards_after_slashing_with_reward_collecting(
     )
 
 
+def test_collect_rewards_restrictions(
+    vault,
+    vault_user,
+    deposit_to_terra,
+    rebase_steth_and_collect_rewards,
+    liquidations_admin,
+    stranger
+):
+    chain = Chain()
+    deposit_to_terra(TERRA_ADDRESS, vault_user, amount=10**18)
+
+    rebase_steth_and_collect_rewards(mult=1)
+
+    chain.sleep(24 * 3600 - 1) #sleep less then 24 hours
+
+    with reverts():
+        vault.collect_rewards({"from": stranger})
+    with reverts():
+        vault.collect_rewards({"from": liquidations_admin})
+
+    chain.sleep(2 * 3600) #sleep less then 24 + 2 hours
+
+    with reverts():
+        vault.collect_rewards({"from": stranger})
+
+
 def test_shares_balance_decrease_liquidation(
     vault, 
     vault_user, 
