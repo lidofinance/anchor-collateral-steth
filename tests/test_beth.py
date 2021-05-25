@@ -83,11 +83,38 @@ def test_transfer(beth_token, vault_user, vault, stranger, helpers):
 def test_transfer_from(beth_token, vault_user, vault, stranger, helpers):
     amount = 10**18
 
-    tx = beth_token.mint(vault_user, amount, {"from": vault})
+    beth_token.mint(vault_user, 10 * amount, {"from": vault})
 
     with reverts():
         beth_token.transferFrom(vault_user, stranger, amount, {"from": stranger})
+
+    stranger_beth_balance_before = beth_token.balanceOf(stranger)
+    vault_user_beth_balance_before = beth_token.balanceOf(vault_user)
+    tx = beth_token.transferFrom(vault_user, stranger, amount, {"from": vault_user})
+    assert beth_token.balanceOf(stranger) == stranger_beth_balance_before + amount
+    assert beth_token.balanceOf(vault_user) == vault_user_beth_balance_before - amount
+    helpers.assert_single_event_named('Transfer', tx, source=beth_token, evt_keys_dict = {
+        "sender": vault_user,
+        "receiver": stranger,
+        "value": amount
+    })
+    helpers.assert_no_events_named('Approval', tx)
     
+
+    tx = beth_token.approve(stranger, 2**256-1, {"from": vault_user})
+    stranger_beth_balance_before = beth_token.balanceOf(stranger)
+    vault_user_beth_balance_before = beth_token.balanceOf(vault_user)
+    tx = beth_token.transferFrom(vault_user, stranger, amount, {"from": stranger})
+    assert beth_token.balanceOf(stranger) == stranger_beth_balance_before + amount
+    assert beth_token.balanceOf(vault_user) == vault_user_beth_balance_before - amount
+    helpers.assert_single_event_named('Transfer', tx, source=beth_token, evt_keys_dict = {
+        "sender": vault_user,
+        "receiver": stranger,
+        "value": amount
+    })
+    helpers.assert_no_events_named('Approval', tx)
+
+
     tx = beth_token.approve(stranger, amount, {"from": vault_user})
     helpers.assert_single_event_named('Approval', tx, source=beth_token, evt_keys_dict = {
         "owner": vault_user,
@@ -100,7 +127,6 @@ def test_transfer_from(beth_token, vault_user, vault, stranger, helpers):
 
     stranger_beth_balance_before = beth_token.balanceOf(stranger)
     vault_user_beth_balance_before = beth_token.balanceOf(vault_user)
-
     tx = beth_token.transferFrom(vault_user, stranger, amount, {"from": stranger})
     assert beth_token.balanceOf(stranger) == stranger_beth_balance_before + amount
     assert beth_token.balanceOf(vault_user) == vault_user_beth_balance_before - amount
