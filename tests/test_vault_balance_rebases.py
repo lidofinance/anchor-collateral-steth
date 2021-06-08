@@ -292,7 +292,7 @@ def test_steth_rewards_after_slashing_with_reward_collecting(
     assert helpers.equal_with_precision(
         steth_token.balanceOf(stranger), 
         adjusted_amount * negative_rebase_multiplier, 
-        100
+        10**10
     )
     steth_token.transfer(vault_user, steth_token.balanceOf(stranger), {"from": stranger})
 
@@ -306,7 +306,7 @@ def test_steth_rewards_after_slashing_with_reward_collecting(
     assert helpers.equal_with_precision(
         steth_token.balanceOf(stranger), 
         adjusted_amount, 
-        100
+        10**10
     )
 
 
