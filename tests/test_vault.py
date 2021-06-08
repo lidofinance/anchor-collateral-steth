@@ -1,7 +1,8 @@
 import pytest
 from brownie import ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
 
-
+ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
+ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 BETH_DECIMALS = 18
 
@@ -9,6 +10,7 @@ BETH_DECIMALS = 18
 @pytest.fixture(scope='function')
 def vault(
     beth_token,
+    steth_token,
     mock_bridge_connector,
     mock_rewards_liquidator,
     deployer,
@@ -16,11 +18,12 @@ def vault(
     liquidations_admin,
     AnchorVault
 ):
-    vault = AnchorVault.deploy(beth_token, admin, {'from': deployer})
+    vault = AnchorVault.deploy(beth_token, steth_token, admin, {'from': deployer})
     vault.configure(
         mock_bridge_connector,
         mock_rewards_liquidator,
         liquidations_admin,
+        ANCHOR_REWARDS_DISTRIBUTOR,
         {'from': admin}
     )
     beth_token.set_minter(vault, {'from': admin})
@@ -145,9 +148,9 @@ def test_change_admin(vault, stranger, admin, helpers):
 
 def test_configuration(vault, stranger, admin, helpers):
     with reverts():
-        vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": stranger})
+        vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_BYTES32, {"from": stranger})
 
-    tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": admin})
+    tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_BYTES32, {"from": admin})
 
     helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={
         'bridge_connector': ZERO_ADDRESS
@@ -157,6 +160,9 @@ def test_configuration(vault, stranger, admin, helpers):
     })
     helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
         'liquidations_admin': ZERO_ADDRESS
+    })
+    helpers.assert_single_event_named('AnchorRewardsDistributorUpdated', tx, source=vault, evt_keys_dict={
+        'anchor_rewards_distributor': ZERO_BYTES32
     })
 
 

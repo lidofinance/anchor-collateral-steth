@@ -2,12 +2,11 @@ import pytest
 from brownie.network.state import Chain
 from brownie import reverts
 
-from test_vault import vault
+from test_vault import vault, ANCHOR_REWARDS_DISTRIBUTOR
 
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 ANOTHER_TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabca'
-ANCHOR_REWARDS_DISTRIBUTOR = '0x0000000000000000000000000000000000000000000000000000000000000000'
 
 # rebase steth and collect rewards will be called at the same time in one oracle callback transaction
 @pytest.fixture(scope="function")
