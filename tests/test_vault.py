@@ -209,17 +209,32 @@ def test_set_liquidations_admin(vault, stranger, admin, helpers):
     })
 
 
-def test_get_rate(vault, steth_token, beth_token, vault_user, helpers):
-
+def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, rebase_steth_by, helpers):
     assert steth_token.balanceOf(vault) == 0
-    assert beth_token.balanceOf(vault) == 0
+    assert beth_token.totalSupply() == 0
     assert vault.get_rate() == 10**18
 
-    steth_token.transfer(vault, 2 * 10**18, {"from": vault_user})
-    assert steth_token.balanceOf(vault) > beth_token.balanceOf(vault)
-    assert vault.get_rate() == 10**18
+    steth_token.approve(vault, 10**18, {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user})
 
-    beth_token.mint(vault, 4 * 10**18, {"from": vault})
-    assert helpers.equal_with_precision(2 * steth_token.balanceOf(vault), beth_token.balanceOf(vault), 10)
-    assert helpers.equal_with_precision(vault.get_rate(), 2 * 10**18, 10)
-    
+    steth_locked = steth_token.balanceOf(vault)
+
+    assert steth_locked > 0
+    assert beth_token.totalSupply() > 0
+    assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
+
+    rebase_steth_by(mult=1.01)
+
+    assert steth_token.balanceOf(vault) > steth_locked
+    assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
+
+
+def test_rate_after_direct_transfer(vault, steth_token, beth_token, vault_user, helpers):
+    steth_token.approve(vault, 10**18, {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user})
+
+    assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
+
+    steth_token.transfer(vault, 10**18, {"from": vault_user})
+
+    assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
