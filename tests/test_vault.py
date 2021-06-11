@@ -7,6 +7,19 @@ TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefa
 BETH_DECIMALS = 18
 
 
+def test_deploy_fails_on_non_zero_beth_total_supply(
+    beth_token,
+    steth_token,
+    admin,
+    deployer,
+    AnchorVault
+):
+    beth_token.set_minter(admin, {'from': admin})
+    beth_token.mint(admin, 10**18, {'from': admin})
+    with reverts():
+        AnchorVault.deploy(beth_token, steth_token, admin, {'from': deployer})
+
+
 @pytest.fixture(scope='function')
 def vault(
     beth_token,

@@ -84,6 +84,7 @@ last_liquidation_shares_steth_rate: public(uint256)
 
 @external
 def __init__(beth_token: address, steth_token: address, admin: address):
+    assert ERC20(beth_token).totalSupply() == 0
     self.beth_token = beth_token
     self.steth_token = steth_token
     self.admin = admin
