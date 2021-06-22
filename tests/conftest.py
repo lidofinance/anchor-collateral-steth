@@ -27,26 +27,31 @@ def liquidations_admin(accounts):
 
 
 @pytest.fixture(scope='module')
-def vault_user(accounts, interface, steth_token):
+def vault_user(accounts, lido):
     user = accounts[3]
-    lido = interface.Lido(steth_token.address)
     lido.submit(ZERO_ADDRESS, {'from': user, 'value': 99 * 10**18})
-    assert steth_token.balanceOf(user) > 98 * 10**18
+    assert lido.balanceOf(user) > 98 * 10**18
     return user
 
 
 @pytest.fixture(scope='module')
-def another_vault_user(accounts, interface, steth_token):
+def another_vault_user(accounts, lido):
     user = accounts[4]
-    lido = interface.Lido(steth_token.address)
     lido.submit(ZERO_ADDRESS, {'from': user, 'value': 99 * 10**18})
-    assert steth_token.balanceOf(user) > 98 * 10**18
+    assert lido.balanceOf(user) > 98 * 10**18
     return user
 
 
 @pytest.fixture(scope='module')
 def stranger(accounts):
     return accounts[9]
+
+
+@pytest.fixture(scope='module')
+def another_stranger(accounts, deployer):
+    acct = accounts.add()
+    deployer.transfer(acct, 10**18)
+    return acct
 
 
 @pytest.fixture(scope='module')
@@ -74,7 +79,7 @@ def mock_bridge(accounts):
     return accounts.add()
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='module')
 def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector, interface):
     mock_bridge_connector =  MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
     ust_token = interface.ERC20(UST_TOKEN)
@@ -83,12 +88,17 @@ def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector
     return mock_bridge_connector
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='module')
 def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
     return MockRewardsLiquidator.deploy({'from': deployer})
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='module')
+def mock_insurance_connector(MockInsuranceConnector, deployer):
+    return MockInsuranceConnector.deploy({'from': deployer})
+
+
+@pytest.fixture(scope='module')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
   def withdraw(terra_address, to_address, amount):
     terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
@@ -99,22 +109,40 @@ def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
 
 
 @pytest.fixture(scope='module')
-def rebase_steth_by(interface, accounts, steth_token):
+def lido_oracle_report(interface, accounts, steth_token):
     lido = interface.Lido(steth_token.address)
     lido_oracle = accounts.at(lido.getOracle(), force=True)
     dao_voting = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
-    def rebase(mult):
+    def report_beacon_state(steth_rebase_mult):
         lido.setFee(0, {'from': dao_voting})
         (deposited_validators, beacon_validators, beacon_balance) = lido.getBeaconStat()
         total_supply = steth_token.totalSupply()
-        total_supply_inc = (mult - 1) * total_supply
+        total_supply_inc = (steth_rebase_mult - 1) * total_supply
         beacon_balance += total_supply_inc
         assert beacon_balance > 0
         lido.pushBeacon(beacon_validators, beacon_balance, {'from': lido_oracle})
-    return rebase
+    return report_beacon_state
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
+def steth_burner(lido, accounts, deployer, interface):
+    burner = accounts.add()
+    deployer.transfer(burner, 10**18)
+    voting_app = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
+    acl = interface.ACL('0x9895F0F17cc1d1891b6f18ee0b483B6f221b37Bb')
+    acl.grantPermission(burner, lido, lido.BURN_ROLE(), {'from': voting_app})
+    return burner
+
+
+@pytest.fixture(scope="module")
+def burn_steth(steth_burner, lido):
+    def burn(holder, amount):
+        shares_amount = lido.getSharesByPooledEth(amount)
+        lido.burnShares(holder, shares_amount, {'from': steth_burner})
+    return burn
+
+
+@pytest.fixture(scope="module")
 def steth_adjusted_ammount(vault, mock_bridge_connector):
     def adjust_amount(amount):
         beth_rate = vault.get_rate()
@@ -125,7 +153,7 @@ def steth_adjusted_ammount(vault, mock_bridge_connector):
     return adjust_amount
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='module')
 def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_adjusted_ammount):
     def deposit(terra_address, sender, amount):
         terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
@@ -170,8 +198,10 @@ class Helpers:
         assert evt_name not in tx.events
 
     @staticmethod
-    def equal_with_precision(x, y, max_diff):
-        return abs(x - y) <= max_diff
+    def equal_with_precision(actual, expected, max_diff = None, max_diff_percent = None):
+        if max_diff is None:
+            max_diff = (max_diff_percent / 100) * expected
+        return abs(actual - expected) <= max_diff
 
 
 

@@ -8,6 +8,7 @@ networks:
       port: 8545
       gas_limit: 12000000
       accounts: 10
+      default_balance: 100000
       evm_version: istanbul
       mnemonic: brownie
       fork: http://localhost:9545

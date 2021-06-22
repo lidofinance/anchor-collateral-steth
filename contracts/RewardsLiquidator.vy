@@ -89,7 +89,7 @@ def configure(
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
 
 
-@view
+@pure
 @internal
 def _percentage_diff(new: uint256, old: uint256) -> uint256:
     if new > old :

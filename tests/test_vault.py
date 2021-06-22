@@ -20,12 +20,13 @@ def test_deploy_fails_on_non_zero_beth_total_supply(
         AnchorVault.deploy(beth_token, steth_token, admin, {'from': deployer})
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='module')
 def vault(
     beth_token,
     steth_token,
     mock_bridge_connector,
     mock_rewards_liquidator,
+    mock_insurance_connector,
     deployer,
     admin,
     liquidations_admin,
@@ -35,6 +36,7 @@ def vault(
     vault.configure(
         mock_bridge_connector,
         mock_rewards_liquidator,
+        mock_insurance_connector,
         liquidations_admin,
         ANCHOR_REWARDS_DISTRIBUTOR,
         {'from': admin}
@@ -50,17 +52,16 @@ def test_initial_config_correct(
     lido,
     mock_bridge_connector,
     mock_rewards_liquidator,
+    mock_insurance_connector,
     liquidations_admin
 ):
     assert vault.admin() == admin
     assert vault.beth_token() == beth_token
     assert vault.bridge_connector() == mock_bridge_connector
     assert vault.rewards_liquidator() == mock_rewards_liquidator
+    assert vault.insurance_connector() == mock_insurance_connector
     assert vault.liquidations_admin() == liquidations_admin
-    assert vault.last_liquidation_time() == 0
-    assert vault.last_liquidation_steth_balance() == 0
-    assert vault.last_liquidation_shares_balance() == 0
-    assert vault.last_liquidation_shares_steth_rate() == lido.getPooledEthByShares(10**18)
+
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
 def test_deposit(
@@ -161,15 +162,32 @@ def test_change_admin(vault, stranger, admin, helpers):
 
 def test_configuration(vault, stranger, admin, helpers):
     with reverts():
-        vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_BYTES32, {"from": stranger})
+        vault.configure(
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_ADDRESS,
+            ZERO_BYTES32,
+            {"from": stranger}
+        )
 
-    tx = vault.configure(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, ZERO_BYTES32, {"from": admin})
+    tx = vault.configure(
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_BYTES32,
+        {"from": admin}
+    )
 
     helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={
         'bridge_connector': ZERO_ADDRESS
     })
     helpers.assert_single_event_named('RewardsLiquidatorUpdated', tx, source=vault, evt_keys_dict={
         'rewards_liquidator': ZERO_ADDRESS
+    })
+    helpers.assert_single_event_named('InsuranceConnectorUpdated', tx, source=vault, evt_keys_dict={
+        'insurance_connector': ZERO_ADDRESS
     })
     helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
         'liquidations_admin': ZERO_ADDRESS
@@ -199,6 +217,16 @@ def test_set_rewards_liquidator(vault, stranger, admin, helpers):
     })
 
 
+def test_set_insurance_connector(vault, stranger, admin, helpers):
+    with reverts():
+        vault.set_insurance_connector(ETH_ADDRESS, {"from": stranger})
+
+    tx = vault.set_insurance_connector(ETH_ADDRESS, {"from": admin})
+    helpers.assert_single_event_named('InsuranceConnectorUpdated', tx, source=vault, evt_keys_dict={
+        'insurance_connector': ETH_ADDRESS
+    })
+
+
 def test_set_liquidations_admin(vault, stranger, admin, helpers):
     with reverts():
         vault.set_liquidations_admin(ETH_ADDRESS, {"from": stranger})
@@ -209,7 +237,7 @@ def test_set_liquidations_admin(vault, stranger, admin, helpers):
     })
 
 
-def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, rebase_steth_by, helpers):
+def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, lido_oracle_report, helpers):
     assert steth_token.balanceOf(vault) == 0
     assert beth_token.totalSupply() == 0
     assert vault.get_rate() == 10**18
@@ -223,7 +251,7 @@ def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, rebase_st
     assert beth_token.totalSupply() > 0
     assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
 
-    rebase_steth_by(mult=1.01)
+    lido_oracle_report(steth_rebase_mult=1.01)
 
     assert steth_token.balanceOf(vault) > steth_locked
     assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
