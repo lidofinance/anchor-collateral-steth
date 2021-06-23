@@ -103,6 +103,62 @@ def test_deposit(
     assert helpers.equal_with_precision(steth_balance_decrease, adjusted_amount, max_diff=1)
 
 
+@pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
+def test_deposit_eth(
+    vault,
+    vault_user,
+    steth_token,
+    beth_token,
+    mock_bridge_connector,
+    helpers,
+    steth_adjusted_ammount,
+    amount
+):
+    steth_balance_before = steth_token.balanceOf(vault_user)
+    terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
+
+    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': amount})
+
+    deposited_amount = tx.events['Deposited']['amount']
+    assert deposited_amount <= amount
+
+    helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
+        'sender': vault_user,
+        'amount': deposited_amount,
+        'terra_address': TERRA_ADDRESS
+    })
+
+    helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
+        'asset_name': 'bETH',
+        'terra_address': TERRA_ADDRESS,
+        'amount': deposited_amount,
+        'extra_data': '0xab'
+    })
+
+    assert beth_token.balanceOf(vault_user) == 0
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + deposited_amount
+
+    steth_balance_increase = steth_token.balanceOf(vault_user) - steth_balance_before
+    assert steth_balance_increase >= 0
+
+    assert helpers.equal_with_precision(
+        steth_balance_increase + deposited_amount,
+        amount,
+        max_diff=10
+    )
+
+
+def test_deposit_eth_fails_on_unexpected_amount(vault, vault_user):
+    with reverts('dev: unexpected ETH amount sent'):
+        vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 - 1})
+
+    with reverts('dev: unexpected ETH amount sent'):
+        vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 + 1})
+
+    with reverts('dev: unexpected ETH amount sent'):
+        vault.submit(0, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18})
+
+
 def test_withdraw(
     vault, 
     vault_user, 

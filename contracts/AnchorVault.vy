@@ -24,6 +24,7 @@ interface Mintable:
 
 
 interface Lido:
+    def submit(referral: address) -> uint256: payable
     def totalSupply() -> uint256: view
     def getTotalShares() -> uint256: view
     def sharesOf(owner: address) -> uint256: view
@@ -242,20 +243,33 @@ def can_deposit_or_withdraw() -> bool:
 
 
 @external
+@payable
 def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
     assert self._can_deposit_or_withdraw() # dev: share price changed
+
+    steth_token: address = self.steth_token
+    steth_amount: uint256 = _amount
+
+    if msg.value != 0:
+        assert msg.value == _amount # dev: unexpected ETH amount sent
+        shares_minted: uint256 = Lido(steth_token).submit(self, value=_amount)
+        steth_amount = Lido(steth_token).getPooledEthByShares(shares_minted)
 
     connector: address = self.bridge_connector
 
     beth_rate: uint256 = self._get_rate(False)
-    beth_amount: uint256 = (_amount * beth_rate) / 10**18
+    beth_amount: uint256 = (steth_amount * beth_rate) / 10**18
     # the bridge might not support full precision amounts
     beth_amount = BridgeConnector(connector).adjust_amount(beth_amount, BETH_DECIMALS)
 
     steth_amount_adj: uint256 = (beth_amount * 10**18) / beth_rate
-    assert steth_amount_adj <= _amount # dev: invalid adjusted amount
+    assert steth_amount_adj <= steth_amount # dev: invalid adjusted amount
 
-    ERC20(self.steth_token).transferFrom(msg.sender, self, steth_amount_adj)
+    if msg.value == 0:
+        ERC20(steth_token).transferFrom(msg.sender, self, steth_amount_adj)
+    elif steth_amount_adj < steth_amount:
+        ERC20(steth_token).transfer(msg.sender, steth_amount - steth_amount_adj)
+
     Mintable(self.beth_token).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
 
