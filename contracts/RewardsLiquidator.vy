@@ -23,16 +23,6 @@ interface CurveStableSwap:
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256) -> uint256: payable
 
 
-interface SushiSwapRouterV2:
-    def getAmountsOut(amountIn: uint256, path: address[2]) -> uint256[2]: view
-    def swapExactETHForTokens(
-        amountOutMin: uint256,
-        path: address[2],
-        to: address,
-        deadline: uint256
-    ) -> uint256[2]: payable
-
-
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
 WETH_TOKEN: constant(address) = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
@@ -68,9 +58,18 @@ def __init__(
     max_steth_price_difference_percent: uint256,
     max_eth_price_difference_percent: uint256
 ):
+    assert max_steth_price_difference_percent <= 10**18, "invalid percentage"
+    assert max_eth_price_difference_percent <= 10**18, "invalid percentage"
+
     self.admin = admin
     self.max_steth_price_difference_percent = max_steth_price_difference_percent
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
+
+
+@external
+@payable
+def __default__():
+    pass
 
 
 @external
@@ -85,6 +84,9 @@ def configure(
     max_eth_price_difference_percent: uint256
 ):
     assert msg.sender == self.admin
+    assert max_steth_price_difference_percent <= 10**18, "invalid percentage"
+    assert max_eth_price_difference_percent <= 10**18, "invalid percentage"
+
     self.max_steth_price_difference_percent = max_steth_price_difference_percent
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
 
@@ -126,6 +128,60 @@ def _get_eth_anchor_price() -> uint256:
     return convert(answer, uint256) * (10 ** (18 - eth_price_decimals))
 
 
+@internal
+@pure
+def _abi_extract_sushi_result(result: Bytes[128]) -> uint256:
+    # The return type is uint256[] and the actual length of the array is 2, so the
+    # layout of the data is (pad32(64) . pad32(2) . pad32(arr[0]) . pad32(arr[1])).
+    # We need the second array item, thus the byte offset is 96.
+    return convert(extract32(result, 96), uint256)
+
+
+@internal
+@view
+def _sushi_get_ust_amount_out(eth_amount_in: uint256) -> uint256:
+    result: Bytes[128] = raw_call(
+        SUSHISWAP_ROUTER_V2,
+        concat(
+            # uint256 amountIn, address[] calldata path
+            method_id("getAmountsOut(uint256,address[])"),
+            convert(eth_amount_in, bytes32),
+            convert(64, bytes32),
+            convert(2, bytes32),
+            convert(WETH_TOKEN, bytes32),
+            convert(UST_TOKEN, bytes32)
+        ),
+        max_outsize=128,
+        is_static_call=True
+    )
+    return self._abi_extract_sushi_result(result)
+
+
+@internal
+def _sushi_sell_eth_to_ust(
+    eth_amount_in: uint256,
+    ust_amount_out_min: uint256,
+    ust_recipient: address
+) -> uint256:
+    result: Bytes[128] = raw_call(
+        SUSHISWAP_ROUTER_V2,
+        concat(
+            # uint256 amountOutMin, address[] calldata path, address to, uint256 deadline
+            method_id("swapExactETHForTokens(uint256,address[],address,uint256)"),
+            convert(ust_amount_out_min, bytes32),
+            convert(128, bytes32),
+            convert(ust_recipient, bytes32),
+            convert(MAX_UINT256, bytes32),
+            convert(2, bytes32),
+            convert(WETH_TOKEN, bytes32),
+            convert(UST_TOKEN, bytes32)
+        ),
+        value=eth_amount_in,
+        max_outsize=128
+    )
+    return self._abi_extract_sushi_result(result)
+
+
 @external
 def liquidate(ust_recipient: address) -> uint256:
     steth_amount: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
@@ -141,6 +197,8 @@ def liquidate(ust_recipient: address) -> uint256:
         (10**18 - self.max_steth_price_difference_percent)
     ) / 10**18
 
+    ERC20(STETH_TOKEN).approve(CURVE_STETH_POOL, steth_amount)
+
     eth_amount: uint256 = CurveStableSwap(CURVE_STETH_POOL).exchange(
         CURVE_STETH_INDEX,
         CURVE_ETH_INDEX,
@@ -149,28 +207,17 @@ def liquidate(ust_recipient: address) -> uint256:
     )
 
     assert eth_amount >= min_eth_amount, "insuff. ETH return"
+    assert self.balance >= eth_amount
 
     eth_anchor_price: uint256 = self._get_eth_anchor_price()
-
-    amounts: uint256[2] = SushiSwapRouterV2(SUSHISWAP_ROUTER_V2).getAmountsOut(
-        eth_amount,
-        SUSHISWAP_EXCH_PATH
-    )
-
-    ust_amount: uint256 = amounts[1]
+    ust_amount: uint256 = self._sushi_get_ust_amount_out(eth_amount)
     eth_price: uint256 = (ust_amount * 10**18) / eth_amount
 
     assert self._percentage_diff(eth_anchor_price, eth_price) <= \
         self.max_eth_price_difference_percent, \
         "ETH price unsafe"
 
-    amounts = SushiSwapRouterV2(SUSHISWAP_ROUTER_V2).swapExactETHForTokens(
-        ust_amount,
-        SUSHISWAP_EXCH_PATH,
-        ust_recipient,
-        MAX_UINT256,
-        value = eth_amount
-    )
+    ust_amount_actual: uint256 = self._sushi_sell_eth_to_ust(eth_amount, ust_amount, ust_recipient)
 
-    assert amounts[1] >= ust_amount, "insuff. UST return"
-    return amounts[1]
+    assert ust_amount_actual >= ust_amount, "insuff. UST return"
+    return ust_amount_actual
