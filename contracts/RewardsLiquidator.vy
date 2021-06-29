@@ -91,8 +91,8 @@ def configure(
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
 
 
-@pure
 @internal
+@pure
 def _percentage_diff(new: uint256, old: uint256) -> uint256:
     if new > old :
         return (new - old) * (10 ** 18) / old
@@ -101,7 +101,8 @@ def _percentage_diff(new: uint256, old: uint256) -> uint256:
 
 
 @internal
-def _get_steth_safe_price() -> uint256:
+@view
+def _get_steth_current_price() -> uint256:
     steth_price: uint256 = 0
     is_price_safe: bool = False
     (steth_price, is_price_safe) = LidoStEthPriceFeed(LIDO_STETH_ETH_FEED).current_price()
@@ -110,6 +111,7 @@ def _get_steth_safe_price() -> uint256:
 
 
 @internal
+@view
 def _get_eth_anchor_price() -> uint256:
     eth_price_decimals: uint256 = ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USD_FEED).decimals()
     assert 0 < eth_price_decimals and eth_price_decimals <= 18
@@ -190,7 +192,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20Decimals(UST_TOKEN).decimals() == 18
     assert ERC20Decimals(STETH_TOKEN).decimals() == 18
 
-    steth_price: uint256 = self._get_steth_safe_price()
+    steth_price: uint256 = self._get_steth_current_price()
 
     min_eth_amount: uint256 = (
         ((steth_price * steth_amount) / 10**18) *
