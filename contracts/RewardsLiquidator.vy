@@ -8,8 +8,8 @@ interface ERC20Decimals:
     def decimals() -> uint256: view
 
 
-interface LidoStEthPriceFeed:
-    def current_price() -> (uint256, bool): view
+interface LidoStethOracle:
+    def stethPrice() -> uint256: view
 
 
 interface ChainlinkAggregatorV3Interface:
@@ -35,7 +35,7 @@ UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
 WETH_TOKEN: constant(address) = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
 
-LIDO_STETH_ETH_FEED: constant(address) = 0xAb55Bf4DfBf469ebfe082b7872557D1F87692Fe6
+LIDO_STETH_ETH_ORACLE: constant(address) = 0x3A6Bd15abf19581e411621D669B6a2bbe741ffD6
 CHAINLINK_ETH_USD_FEED: constant(address) = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
 
 CURVE_STETH_POOL: constant(address) = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022
@@ -55,8 +55,7 @@ admin: public(address)
 max_eth_price_difference_percent: public(uint256)
 
 # Maximum difference (in percents multiplied by 10**18) between the resulting
-# stETH/ETH price and the current stETH/ETH price obtained from the stETH price
-# feed (given that the current price is already considered safe by the feed).
+# stETH/ETH price and the stETH/ETH anchor price obtained from the oracle.
 max_steth_price_difference_percent: public(uint256)
 
 
@@ -110,12 +109,8 @@ def _percentage_diff(new: uint256, old: uint256) -> uint256:
 
 @internal
 @view
-def _get_steth_current_price() -> uint256:
-    steth_price: uint256 = 0
-    is_price_safe: bool = False
-    (steth_price, is_price_safe) = LidoStEthPriceFeed(LIDO_STETH_ETH_FEED).current_price()
-    assert is_price_safe or steth_price > 10**18, "stETH price unsafe"
-    return steth_price
+def _get_steth_anchor_price() -> uint256:
+    return LidoStethOracle(LIDO_STETH_ETH_ORACLE).stethPrice()
 
 
 @internal
@@ -200,10 +195,10 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20Decimals(UST_TOKEN).decimals() == 18
     assert ERC20Decimals(STETH_TOKEN).decimals() == 18
 
-    steth_price: uint256 = self._get_steth_current_price()
+    steth_anchor_price: uint256 = self._get_steth_anchor_price()
 
     min_eth_amount: uint256 = (
-        ((steth_price * steth_amount) / 10**18) *
+        ((steth_anchor_price * steth_amount) / 10**18) *
         (10**18 - self.max_steth_price_difference_percent)
     ) / 10**18
 
@@ -235,7 +230,7 @@ def liquidate(ust_recipient: address) -> uint256:
         steth_amount,
         eth_amount,
         ust_amount_actual,
-        steth_price,
+        steth_anchor_price,
         eth_anchor_price
     )
 
