@@ -23,6 +23,14 @@ interface CurveStableSwap:
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256) -> uint256: payable
 
 
+event SoldStethToUST:
+    steth_amount: uint256
+    eth_amount: uint256
+    ust_amount: uint256
+    steth_anchor_price: uint256
+    ust_anchor_price: uint256
+
+
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
 WETH_TOKEN: constant(address) = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
@@ -222,4 +230,13 @@ def liquidate(ust_recipient: address) -> uint256:
     ust_amount_actual: uint256 = self._sushi_sell_eth_to_ust(eth_amount, ust_amount, ust_recipient)
 
     assert ust_amount_actual >= ust_amount, "insuff. UST return"
+
+    log SoldStethToUST(
+        steth_amount,
+        eth_amount,
+        ust_amount_actual,
+        steth_price,
+        eth_anchor_price
+    )
+
     return ust_amount_actual
