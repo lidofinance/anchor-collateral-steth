@@ -80,11 +80,16 @@ def mock_bridge(accounts):
 
 
 @pytest.fixture(scope='module')
-def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector, interface):
+def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector, interface, accounts):
     mock_bridge_connector =  MockBridgeConnector.deploy(beth_token, mock_bridge, {'from': deployer})
-    ust_token = interface.ERC20(UST_TOKEN)
-    ust_balance = ust_token.balanceOf(UST_TOKEN)
-    interface.ERC20(UST_TOKEN).transfer(mock_bridge_connector.address, ust_balance, {"from": UST_TOKEN})
+
+    ust_token = interface.UST(UST_TOKEN)
+    ust_owner = accounts.at(ust_token.owner(), force=True)
+    ust_amount = 10_000_000 * 10**18
+
+    ust_token.mint(mock_bridge_connector, ust_amount, {'from': ust_owner})
+    assert ust_token.balanceOf(mock_bridge_connector) == ust_amount
+
     return mock_bridge_connector
 
 
