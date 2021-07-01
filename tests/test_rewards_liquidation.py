@@ -1,6 +1,5 @@
 import pytest
-from brownie import reverts, ZERO_ADDRESS
-from brownie.network.state import Chain
+from brownie import chain, reverts, ZERO_ADDRESS
 from brownie.network.event import _decode_logs
 
 from test_vault import vault, ANCHOR_REWARDS_DISTRIBUTOR
@@ -15,11 +14,12 @@ CURVE_STETH_INDEX = 1
 SUSHISWAP_ROUTER_V2 = '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
 WETH_TOKEN = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 
+
 @pytest.fixture(scope='module')
-def someone_with_money(lido, accounts):
-    whale = accounts[5]
-    lido.submit(ZERO_ADDRESS, {"from": whale, "value": whale.balance() // 2})
-    return whale
+def whale(lido, accounts):
+    acct = accounts[5]
+    lido.submit(ZERO_ADDRESS, {'from': acct, 'value': acct.balance() // 2})
+    return acct
 
 
 @pytest.fixture(scope='module')
@@ -136,20 +136,20 @@ def test_sells_steth_balance_to_ust(
 
 def test_configure(liquidator, admin, stranger, helpers):
     with reverts():
-        liquidator.configure(10**18, 10**18, {"from": stranger})
+        liquidator.configure(10**18, 10**18, {'from': stranger})
 
     with reverts():
-        liquidator.configure(10**18 + 1, 10**18, {"from": admin})
+        liquidator.configure(10**18 + 1, 10**18, {'from': admin})
 
     with reverts():
-        liquidator.configure(10**18, 10**18 + 1, {"from": admin})
+        liquidator.configure(10**18, 10**18 + 1, {'from': admin})
     
     new_max_eth_diff = 0.5 * 10**18
     new_max_steth_diff = 0.6 * 10**18
 
     assert liquidator.max_steth_price_difference_percent() != new_max_steth_diff
     assert liquidator.max_eth_price_difference_percent() != new_max_eth_diff
-    tx = liquidator.configure(new_max_steth_diff, new_max_eth_diff, {"from": admin})
+    tx = liquidator.configure(new_max_steth_diff, new_max_eth_diff, {'from': admin})
 
     assert liquidator.max_steth_price_difference_percent() == new_max_steth_diff
     assert liquidator.max_eth_price_difference_percent() == new_max_eth_diff
@@ -160,9 +160,9 @@ def test_configure(liquidator, admin, stranger, helpers):
     })
 
     with reverts():
-        liquidator.change_admin(stranger, {"from": stranger})
+        liquidator.change_admin(stranger, {'from': stranger})
 
-    tx = liquidator.change_admin(stranger, {"from": admin})
+    tx = liquidator.change_admin(stranger, {'from': admin})
     assert liquidator.admin() == stranger
     
     helpers.assert_single_event_named('AdminChanged', tx, source=liquidator, evt_keys_dict={
@@ -170,9 +170,9 @@ def test_configure(liquidator, admin, stranger, helpers):
     })
 
 
-def test_steth_pool_price_change(
+def test_fails_on_excess_steth_price_change(
     interface,
-    someone_with_money,
+    whale,
     steth_token,
     vault_user,
     mock_vault,
@@ -184,11 +184,11 @@ def test_steth_pool_price_change(
     old_steth_price = steth_pool.get_dy(CURVE_STETH_INDEX,CURVE_ETH_INDEX,10**18)
 
     liquidity_amount = 3 * 10**24
-    steth_token.approve(steth_pool, liquidity_amount, {"from": someone_with_money})
-    steth_pool.add_liquidity([0,liquidity_amount], 0, {"from": someone_with_money})
+    steth_token.approve(steth_pool, liquidity_amount, {'from': whale})
+    steth_pool.add_liquidity([0, liquidity_amount], 0, {'from': whale})
 
     new_steth_price = steth_pool.get_dy(CURVE_STETH_INDEX,CURVE_ETH_INDEX,10**18)
-    assert old_steth_price*((100-MAX_STETH_PRICE_DIFF_PERCENT)/100) >= new_steth_price
+    assert old_steth_price * ((100 - MAX_STETH_PRICE_DIFF_PERCENT) / 100) >= new_steth_price
 
     steth_amount = 10**18
     steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
@@ -197,9 +197,9 @@ def test_steth_pool_price_change(
         liquidator.liquidate(ust_recipient, {'from': mock_vault})
 
 
-def test_eth_pool_price_change(
+def test_fails_on_excess_eth_price_change(
     interface,
-    someone_with_money,
+    whale,
     steth_token,
     vault_user,
     ust_recipient,
@@ -207,7 +207,6 @@ def test_eth_pool_price_change(
     ust_token,
     mock_vault
 ):
-    chain = Chain()
     pool = interface.Sushi(SUSHISWAP_ROUTER_V2)
 
     (_, old_eth_price) = pool.getAmountsOut(10**18, [WETH_TOKEN, ust_token])
@@ -215,12 +214,12 @@ def test_eth_pool_price_change(
     pool.swapExactETHForTokens(
         779298770, 
         [WETH_TOKEN, ust_token], 
-        someone_with_money, 
+        whale,
         deadline,
-        {"from": someone_with_money, "amount": 2.9*10**24}
+        {'from': whale, 'amount': 2.9*10**24}
     )
     (_, new_price) = pool.getAmountsOut(10**18, [WETH_TOKEN, ust_token]) 
-    assert new_price < old_eth_price * (100-MAX_ETH_PRICE_DIFF_PERCENT)/100
+    assert new_price < old_eth_price * (100 - MAX_ETH_PRICE_DIFF_PERCENT) / 100
 
     steth_amount = 10**18
     steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
