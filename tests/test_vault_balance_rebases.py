@@ -17,7 +17,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         10**18,
-        max_diff = 100
+        max_diff = 1000
     )
 
     lido_oracle_report(steth_rebase_mult=1.1)
@@ -25,7 +25,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         10**18,
-        max_diff = 100
+        max_diff = 1000
     )
 
     vault.collect_rewards({'from': liquidations_admin})
@@ -33,7 +33,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         10**18,
-        max_diff = 100
+        max_diff = 1000
     )
 
     lido_oracle_report(steth_rebase_mult=0.9)
@@ -41,7 +41,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         int((1 / 0.9) * 10**18),
-        max_diff = 100
+        max_diff = 1000
     )
 
     lido_oracle_report(steth_rebase_mult=1.01)
@@ -49,7 +49,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         int((1 / 0.909) * 10**18),
-        max_diff = 100
+        max_diff = 1000
     )
 
     chain.mine(timedelta = 3600*24 + 1)
@@ -58,7 +58,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         int((1 / 0.909) * 10**18),
-        max_diff = 100
+        max_diff = 1000
     )
 
     lido_oracle_report(steth_rebase_mult=2.0)
@@ -66,7 +66,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         10**18,
-        max_diff = 100
+        max_diff = 1000
     )
 
     chain.mine(timedelta = 3600*24 + 1)
@@ -75,7 +75,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert helpers.equal_with_precision(
         vault.get_rate(),
         int((1 / 0.909) * 10**18),
-        max_diff = 100
+        max_diff = 1000
     )
 
 
