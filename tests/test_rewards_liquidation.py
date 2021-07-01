@@ -226,3 +226,51 @@ def test_fails_on_excess_eth_price_change(
 
     with reverts():
         liquidator.liquidate(ust_recipient, {'from': mock_vault})
+
+
+TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
+
+
+def test_integrates_with_real_vault(
+    RewardsLiquidator,
+    mock_bridge_connector,
+    steth_token,
+    deployer,
+    admin,
+    vault,
+    vault_user,
+    liquidations_admin,
+    lido_oracle_report,
+    steth_adjusted_ammount,
+    helpers
+):
+    liquidator = RewardsLiquidator.deploy(
+        vault,
+        admin,
+        int(MAX_STETH_PRICE_DIFF_PERCENT * 10**18 / 100),
+        int(MAX_ETH_PRICE_DIFF_PERCENT * 10**18 / 100),
+        {'from': deployer}
+    )
+
+    vault.set_rewards_liquidator(liquidator, {'from': admin})
+
+    amount = 1 * 10**18
+    adjusted_amount = steth_adjusted_ammount(amount)
+
+    steth_token.approve(vault, amount, {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, b'', {'from': vault_user})
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == adjusted_amount
+
+    lido_oracle_report(steth_rebase_mult=1.01)
+
+    tx = vault.collect_rewards({'from': liquidations_admin})
+
+    vault_evt = helpers.assert_single_event_named('RewardsCollected', tx, source=vault)
+
+    assert vault_evt['steth_amount'] > 0
+    assert vault_evt['ust_amount'] > 0
+
+    liquidator_evt = helpers.assert_single_event_named('SoldStethToUST', tx, source=liquidator)
+
+    assert abs(liquidator_evt['steth_amount'] - vault_evt['steth_amount']) < 10
+    assert liquidator_evt['ust_amount'] == vault_evt['ust_amount']
