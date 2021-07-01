@@ -63,8 +63,10 @@ event InsuranceConnectorUpdated:
     insurance_connector: address
 
 
-event LiquidationsAdminUpdated:
+event LiquidationConfigUpdated:
     liquidations_admin: address
+    no_liquidation_interval: uint256
+    restricted_liquidation_interval: uint256
 
 
 event AnchorRewardsDistributorUpdated:
@@ -73,10 +75,6 @@ event AnchorRewardsDistributorUpdated:
 
 BETH_DECIMALS: constant(uint256) = 18
 
-# no rewards liquidations for 24h since previous liquidation
-NO_LIQUIDATION_INTERVAL: constant(uint256) = 60 * 60 * 24
-# only admin can liquidate rewards for the first 2h after that
-RESTRICTED_LIQUIDATION_INTERVAL: constant(uint256) = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 admin: public(address)
 
@@ -88,6 +86,9 @@ insurance_connector: public(address)
 anchor_rewards_distributor: public(bytes32)
 
 liquidations_admin: public(address)
+no_liquidation_interval: public(uint256)
+restricted_liquidation_interval: public(uint256)
+
 last_liquidation_time: public(uint256)
 last_liquidation_share_price: public(uint256)
 last_liquidation_shares_burnt: public(uint256)
@@ -147,15 +148,36 @@ def set_insurance_connector(_insurance_connector: address):
 
 
 @internal
-def _set_liquidations_admin(_liquidations_admin: address):
+def _set_liquidation_config(
+    _liquidations_admin: address,
+    _no_liquidation_interval: uint256,
+    _restricted_liquidation_interval: uint256
+):
+    assert _restricted_liquidation_interval >= _no_liquidation_interval
+
     self.liquidations_admin = _liquidations_admin
-    log LiquidationsAdminUpdated(_liquidations_admin)
+    self.no_liquidation_interval = _no_liquidation_interval
+    self.restricted_liquidation_interval = _restricted_liquidation_interval
+
+    log LiquidationConfigUpdated(
+        _liquidations_admin,
+        _no_liquidation_interval,
+        _restricted_liquidation_interval
+    )
 
 
 @external
-def set_liquidations_admin(_liquidations_admin: address):
+def set_liquidation_config(
+    _liquidations_admin: address,
+    _no_liquidation_interval: uint256,
+    _restricted_liquidation_interval: uint256,
+):
     assert msg.sender == self.admin # dev: unauthorized
-    self._set_liquidations_admin(_liquidations_admin)
+    self._set_liquidation_config(
+        _liquidations_admin,
+        _no_liquidation_interval,
+        _restricted_liquidation_interval
+    )
 
 
 @internal
@@ -176,13 +198,19 @@ def configure(
     _rewards_liquidator: address,
     _insurance_connector: address,
     _liquidations_admin: address,
+    _no_liquidation_interval: uint256,
+    _restricted_liquidation_interval: uint256,
     _anchor_rewards_distributor: bytes32,
 ):
     assert msg.sender == self.admin # dev: unauthorized
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
     self._set_insurance_connector(_insurance_connector)
-    self._set_liquidations_admin(_liquidations_admin)
+    self._set_liquidation_config(
+        _liquidations_admin,
+        _no_liquidation_interval,
+        _restricted_liquidation_interval
+    )
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
 
@@ -294,9 +322,9 @@ def collect_rewards() -> uint256:
     time_since_last_liquidation: uint256 = block.timestamp - self.last_liquidation_time
 
     if msg.sender == self.liquidations_admin:
-        assert time_since_last_liquidation > NO_LIQUIDATION_INTERVAL # dev: too eraly to sell
+        assert time_since_last_liquidation > self.no_liquidation_interval # dev: too early to sell
     else:
-        assert time_since_last_liquidation > RESTRICTED_LIQUIDATION_INTERVAL # dev: too eraly to sell
+        assert time_since_last_liquidation > self.restricted_liquidation_interval # dev: too early to sell
 
     # The code below sells all rewards accrued by stETH held in the vallet to UST
     # and forwards the outcome to the rewards distributor contract in Terra.

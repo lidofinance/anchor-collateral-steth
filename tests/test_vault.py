@@ -6,6 +6,12 @@ ZERO_BYTES32 = '0x00000000000000000000000000000000000000000000000000000000000000
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 BETH_DECIMALS = 18
 
+# no rewards liquidations for 24h since previous liquidation
+NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
+
+# only admin can liquidate rewards for the first 2h after that
+RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
+
 
 def test_deploy_fails_on_non_zero_beth_total_supply(
     beth_token,
@@ -38,6 +44,8 @@ def vault(
         mock_rewards_liquidator,
         mock_insurance_connector,
         liquidations_admin,
+        NO_LIQUIDATION_INTERVAL,
+        RESTRICTED_LIQUIDATION_INTERVAL,
         ANCHOR_REWARDS_DISTRIBUTOR,
         {'from': admin}
     )
@@ -61,6 +69,8 @@ def test_initial_config_correct(
     assert vault.rewards_liquidator() == mock_rewards_liquidator
     assert vault.insurance_connector() == mock_insurance_connector
     assert vault.liquidations_admin() == liquidations_admin
+    assert vault.no_liquidation_interval() == NO_LIQUIDATION_INTERVAL
+    assert vault.restricted_liquidation_interval() == RESTRICTED_LIQUIDATION_INTERVAL
 
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
@@ -223,6 +233,8 @@ def test_configuration(vault, stranger, admin, helpers):
             ZERO_ADDRESS,
             ZERO_ADDRESS,
             ZERO_ADDRESS,
+            0,
+            0,
             ZERO_BYTES32,
             {"from": stranger}
         )
@@ -232,6 +244,8 @@ def test_configuration(vault, stranger, admin, helpers):
         ZERO_ADDRESS,
         ZERO_ADDRESS,
         ZERO_ADDRESS,
+        0,
+        0,
         ZERO_BYTES32,
         {"from": admin}
     )
@@ -245,8 +259,10 @@ def test_configuration(vault, stranger, admin, helpers):
     helpers.assert_single_event_named('InsuranceConnectorUpdated', tx, source=vault, evt_keys_dict={
         'insurance_connector': ZERO_ADDRESS
     })
-    helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
-        'liquidations_admin': ZERO_ADDRESS
+    helpers.assert_single_event_named('LiquidationConfigUpdated', tx, source=vault, evt_keys_dict={
+        'liquidations_admin': ZERO_ADDRESS,
+        'no_liquidation_interval': 0,
+        'restricted_liquidation_interval': 0
     })
     helpers.assert_single_event_named('AnchorRewardsDistributorUpdated', tx, source=vault, evt_keys_dict={
         'anchor_rewards_distributor': ZERO_BYTES32
@@ -258,6 +274,7 @@ def test_set_bridge_connector(vault, stranger, admin, helpers):
         vault.set_bridge_connector(ETH_ADDRESS, {"from": stranger})
 
     tx = vault.set_bridge_connector(ETH_ADDRESS, {"from": admin})
+
     helpers.assert_single_event_named('BridgeConnectorUpdated', tx, source=vault, evt_keys_dict={
         'bridge_connector': ETH_ADDRESS
     })
@@ -268,6 +285,7 @@ def test_set_rewards_liquidator(vault, stranger, admin, helpers):
         vault.set_rewards_liquidator(ETH_ADDRESS, {"from": stranger})
 
     tx = vault.set_rewards_liquidator(ETH_ADDRESS, {"from": admin})
+
     helpers.assert_single_event_named('RewardsLiquidatorUpdated', tx, source=vault, evt_keys_dict={
         'rewards_liquidator': ETH_ADDRESS
     })
@@ -278,18 +296,25 @@ def test_set_insurance_connector(vault, stranger, admin, helpers):
         vault.set_insurance_connector(ETH_ADDRESS, {"from": stranger})
 
     tx = vault.set_insurance_connector(ETH_ADDRESS, {"from": admin})
+
     helpers.assert_single_event_named('InsuranceConnectorUpdated', tx, source=vault, evt_keys_dict={
         'insurance_connector': ETH_ADDRESS
     })
 
 
-def test_set_liquidations_admin(vault, stranger, admin, helpers):
+def test_set_liquidation_config(vault, stranger, admin, helpers):
     with reverts():
-        vault.set_liquidations_admin(ETH_ADDRESS, {"from": stranger})
+        vault.set_liquidation_config(ETH_ADDRESS, 100, 200, {"from": stranger})
 
-    tx = vault.set_liquidations_admin(ETH_ADDRESS, {"from": admin})
-    helpers.assert_single_event_named('LiquidationsAdminUpdated', tx, source=vault, evt_keys_dict={
-        'liquidations_admin': ETH_ADDRESS
+    with reverts():
+        vault.set_liquidation_config(ETH_ADDRESS, 100, 99, {"from": admin})
+
+    tx = vault.set_liquidation_config(ETH_ADDRESS, 100, 200, {"from": admin})
+
+    helpers.assert_single_event_named('LiquidationConfigUpdated', tx, source=vault, evt_keys_dict={
+        'liquidations_admin': ETH_ADDRESS,
+        'no_liquidation_interval': 100,
+        'restricted_liquidation_interval': 200
     })
 
 
