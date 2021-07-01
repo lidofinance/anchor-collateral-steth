@@ -1,6 +1,7 @@
 import pytest
-from brownie import reverts, ZERO_ADDRESS, Contract
+from brownie import reverts, ZERO_ADDRESS
 from brownie.network.state import Chain
+from brownie.network.event import _decode_logs
 
 
 ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
@@ -38,7 +39,7 @@ def ust_recipient(accounts, ust_token):
     return acct
 
 
-def test_init(RewardsLiquidator, deployer, admin):
+def test_init(RewardsLiquidator, deployer, admin, helpers):
     max_steth_diff = int(MAX_STETH_PRICE_DIFF_PERCENT * 10**18 / 100)
     max_eth_diff = int(MAX_ETH_PRICE_DIFF_PERCENT * 10**18 / 100)
 
@@ -69,6 +70,15 @@ def test_init(RewardsLiquidator, deployer, admin):
     assert liquidator.max_eth_price_difference_percent() == max_eth_diff
     assert liquidator.admin() == admin
 
+    tx_events = _decode_logs(liquidator.tx.logs)
+
+    assert 'PriceDifferenceChanged' in tx_events
+    assert 'AdminChanged' in tx_events
+    assert tx_events['PriceDifferenceChanged']['max_steth_price_difference_percent'] == max_steth_diff
+    assert tx_events['PriceDifferenceChanged']['max_eth_price_difference_percent'] == max_eth_diff
+    assert tx_events['AdminChanged']['new_admin'] == admin
+
+
 def test_sells_steth_balance_to_ust(
     liquidator,
     steth_token,
@@ -93,7 +103,7 @@ def test_sells_steth_balance_to_ust(
     assert ust_token.balanceOf(ust_recipient) == evt['ust_amount']
 
 
-def test_configure(liquidator, admin, stranger):
+def test_configure(liquidator, admin, stranger, helpers):
     with reverts():
         liquidator.configure(10**18, 10**18, {"from": stranger})
 
@@ -108,16 +118,25 @@ def test_configure(liquidator, admin, stranger):
 
     assert liquidator.max_steth_price_difference_percent() != new_max_steth_diff
     assert liquidator.max_eth_price_difference_percent() != new_max_eth_diff
-    liquidator.configure(new_max_steth_diff, new_max_eth_diff, {"from": admin})
+    tx = liquidator.configure(new_max_steth_diff, new_max_eth_diff, {"from": admin})
 
     assert liquidator.max_steth_price_difference_percent() == new_max_steth_diff
     assert liquidator.max_eth_price_difference_percent() == new_max_eth_diff
+   
+    helpers.assert_single_event_named('PriceDifferenceChanged', tx, source=liquidator, evt_keys_dict={
+        'max_steth_price_difference_percent': new_max_steth_diff,
+        'max_eth_price_difference_percent': new_max_eth_diff
+    })
 
     with reverts():
         liquidator.change_admin(stranger, {"from": stranger})
 
-    liquidator.change_admin(stranger, {"from": admin})
+    tx = liquidator.change_admin(stranger, {"from": admin})
     assert liquidator.admin() == stranger
+    
+    helpers.assert_single_event_named('AdminChanged', tx, source=liquidator, evt_keys_dict={
+        'new_admin': stranger
+    })
 
 
 def test_steth_pool_price_change(

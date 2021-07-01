@@ -31,6 +31,15 @@ event SoldStethToUST:
     ust_anchor_price: uint256
 
 
+event AdminChanged:
+    new_admin: address
+
+
+event PriceDifferenceChanged:
+    max_steth_price_difference_percent: uint256
+    max_eth_price_difference_percent: uint256
+
+
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84
 WETH_TOKEN: constant(address) = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2
@@ -72,6 +81,12 @@ def __init__(
     self.max_steth_price_difference_percent = max_steth_price_difference_percent
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
 
+    log AdminChanged(self.admin)
+    log PriceDifferenceChanged(
+        self.max_steth_price_difference_percent, 
+        self.max_eth_price_difference_percent
+    )
+
 
 @external
 @payable
@@ -83,6 +98,7 @@ def __default__():
 def change_admin(new_admin: address):
     assert msg.sender == self.admin
     self.admin = new_admin
+    log AdminChanged(self.admin)
 
 
 @external
@@ -96,6 +112,11 @@ def configure(
 
     self.max_steth_price_difference_percent = max_steth_price_difference_percent
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
+
+    log PriceDifferenceChanged(
+        self.max_steth_price_difference_percent, 
+        self.max_eth_price_difference_percent
+    )
 
 
 @internal
