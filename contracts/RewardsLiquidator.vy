@@ -59,6 +59,9 @@ SUSHISWAP_EXCH_PATH: constant(address[2]) = [WETH_TOKEN, UST_TOKEN]
 # An address that is allowed to configure the liquidator settings.
 admin: public(address)
 
+# An address that is allowed to sell.
+vault: public(address)
+
 # Maximum difference (in percents multiplied by 10**18) between the resulting
 # ETH/UST price and the ETH/USD anchor price obtained from the oracle.
 max_eth_price_difference_percent: public(uint256)
@@ -70,6 +73,7 @@ max_steth_price_difference_percent: public(uint256)
 
 @external
 def __init__(
+    vault: address,
     admin: address,
     max_steth_price_difference_percent: uint256,
     max_eth_price_difference_percent: uint256
@@ -77,11 +81,13 @@ def __init__(
     assert max_steth_price_difference_percent <= 10**18, "invalid percentage"
     assert max_eth_price_difference_percent <= 10**18, "invalid percentage"
 
+    self.vault = vault
     self.admin = admin
     self.max_steth_price_difference_percent = max_steth_price_difference_percent
     self.max_eth_price_difference_percent = max_eth_price_difference_percent
 
     log AdminChanged(self.admin)
+
     log PriceDifferenceChanged(
         self.max_steth_price_difference_percent, 
         self.max_eth_price_difference_percent
@@ -183,6 +189,8 @@ def _get_min_amount_out(amount_in: uint256, price: uint256, max_diff_percent: ui
 
 @external
 def liquidate(ust_recipient: address) -> uint256:
+    assert msg.sender == self.vault, "unauthorized"
+
     steth_amount: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
     assert steth_amount > 0, "zero stETH balance"
 

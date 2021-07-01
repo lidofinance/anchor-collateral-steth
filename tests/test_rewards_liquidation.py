@@ -3,8 +3,8 @@ from brownie import reverts, ZERO_ADDRESS
 from brownie.network.state import Chain
 from brownie.network.event import _decode_logs
 
+from test_vault import vault, ANCHOR_REWARDS_DISTRIBUTOR
 
-ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
 
 MAX_STETH_PRICE_DIFF_PERCENT = 10
 MAX_ETH_PRICE_DIFF_PERCENT = 5
@@ -12,7 +12,7 @@ MAX_ETH_PRICE_DIFF_PERCENT = 5
 CURVE_STETH_POOL = '0xDC24316b9AE028F1497c275EB9192a3Ea0f67022'
 CURVE_ETH_INDEX = 0
 CURVE_STETH_INDEX = 1
-SUSHISWAP_ROUTER_V2 = 'd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
+SUSHISWAP_ROUTER_V2 = '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F'
 WETH_TOKEN = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 
 @pytest.fixture(scope='module')
@@ -23,8 +23,16 @@ def someone_with_money(lido, accounts):
 
 
 @pytest.fixture(scope='module')
-def liquidator(RewardsLiquidator, deployer, admin):
+def mock_vault(accounts, deployer):
+    acct = accounts.add()
+    deployer.transfer(acct, 10**18)
+    return acct
+
+
+@pytest.fixture(scope='module')
+def liquidator(RewardsLiquidator, deployer, admin, mock_vault):
     return RewardsLiquidator.deploy(
+        mock_vault,
         admin,
         int(MAX_STETH_PRICE_DIFF_PERCENT * 10**18 / 100),
         int(MAX_ETH_PRICE_DIFF_PERCENT * 10**18 / 100),
@@ -39,13 +47,14 @@ def ust_recipient(accounts, ust_token):
     return acct
 
 
-def test_init(RewardsLiquidator, deployer, admin, helpers):
+def test_init(RewardsLiquidator, deployer, admin, mock_vault, helpers):
     max_steth_diff = int(MAX_STETH_PRICE_DIFF_PERCENT * 10**18 / 100)
     max_eth_diff = int(MAX_ETH_PRICE_DIFF_PERCENT * 10**18 / 100)
 
     with reverts():
         RewardsLiquidator.deploy(
-            admin, 
+            mock_vault,
+            admin,
             10**18+1,
             max_eth_diff,
             {'from': deployer}
@@ -53,14 +62,16 @@ def test_init(RewardsLiquidator, deployer, admin, helpers):
 
     with reverts():
         RewardsLiquidator.deploy(
-            admin, 
+            mock_vault,
+            admin,
             max_steth_diff,
             10**18+1,
             {'from': deployer}
         )
 
     liquidator = RewardsLiquidator.deploy(
-        admin, 
+        mock_vault,
+        admin,
         max_steth_diff,
         max_eth_diff,
         {'from': deployer}
@@ -69,14 +80,33 @@ def test_init(RewardsLiquidator, deployer, admin, helpers):
     assert liquidator.max_steth_price_difference_percent() == max_steth_diff
     assert liquidator.max_eth_price_difference_percent() == max_eth_diff
     assert liquidator.admin() == admin
+    assert liquidator.vault() == mock_vault
 
     tx_events = _decode_logs(liquidator.tx.logs)
 
     assert 'PriceDifferenceChanged' in tx_events
     assert 'AdminChanged' in tx_events
+
     assert tx_events['PriceDifferenceChanged']['max_steth_price_difference_percent'] == max_steth_diff
     assert tx_events['PriceDifferenceChanged']['max_eth_price_difference_percent'] == max_eth_diff
     assert tx_events['AdminChanged']['new_admin'] == admin
+
+
+def test_only_allows_liquidation_by_vault(
+    liquidator,
+    steth_token,
+    vault_user,
+    mock_vault,
+    stranger,
+    ust_recipient,
+):
+    steth_amount = 10**18
+    steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
+
+    with reverts('unauthorized'):
+        liquidator.liquidate(ust_recipient, {'from': stranger})
+
+    liquidator.liquidate(ust_recipient, {'from': mock_vault})
 
 
 def test_sells_steth_balance_to_ust(
@@ -84,13 +114,14 @@ def test_sells_steth_balance_to_ust(
     steth_token,
     ust_token,
     vault_user,
+    mock_vault,
     ust_recipient,
     helpers,
 ):
     steth_amount = 10**18
     steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
 
-    tx = liquidator.liquidate(ust_recipient)
+    tx = liquidator.liquidate(ust_recipient, {'from': mock_vault})
 
     assert liquidator.balance() == 0
     assert steth_token.balanceOf(liquidator) < 100
@@ -144,6 +175,7 @@ def test_steth_pool_price_change(
     someone_with_money,
     steth_token,
     vault_user,
+    mock_vault,
     ust_recipient,
     liquidator
 ):
@@ -162,7 +194,7 @@ def test_steth_pool_price_change(
     steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
 
     with reverts():
-        liquidator.liquidate(ust_recipient)
+        liquidator.liquidate(ust_recipient, {'from': mock_vault})
 
 
 def test_eth_pool_price_change(
@@ -172,7 +204,8 @@ def test_eth_pool_price_change(
     vault_user,
     ust_recipient,
     liquidator,
-    ust_token
+    ust_token,
+    mock_vault
 ):
     chain = Chain()
     pool = interface.Sushi(SUSHISWAP_ROUTER_V2)
@@ -193,4 +226,4 @@ def test_eth_pool_price_change(
     steth_token.transfer(liquidator, steth_amount, {'from': vault_user})
 
     with reverts():
-        liquidator.liquidate(ust_recipient)
+        liquidator.liquidate(ust_recipient, {'from': mock_vault})
