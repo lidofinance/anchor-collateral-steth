@@ -17,7 +17,7 @@ WETH_TOKEN = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
 
 @pytest.fixture(scope='module')
 def someone_with_money(lido, accounts):
-    whale = accounts.at('0x00000000219ab540356cBB839Cbe05303d7705Fa', force=True)
+    whale = accounts[5]
     lido.submit(ZERO_ADDRESS, {"from": whale, "value": "3000000 ether"})
     return whale
 
