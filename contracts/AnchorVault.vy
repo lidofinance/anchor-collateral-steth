@@ -107,6 +107,7 @@ def __init__(beth_token: address, steth_token: address, admin: address):
 @external
 def change_admin(new_admin: address):
     assert msg.sender == self.admin # dev: unauthorized
+    # we're intentionally allowing to set admin to zero address for ossification purposes
     self.admin = new_admin
     log AdminChanged(new_admin)
 
