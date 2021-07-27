@@ -78,6 +78,9 @@ def __init__(
     max_steth_price_difference_percent: uint256,
     max_eth_price_difference_percent: uint256
 ):
+    assert ERC20Decimals(UST_TOKEN).decimals() == 18
+    assert ERC20Decimals(STETH_TOKEN).decimals() == 18
+
     assert max_steth_price_difference_percent <= 10**18, "invalid percentage"
     assert max_eth_price_difference_percent <= 10**18, "invalid percentage"
 
@@ -193,9 +196,6 @@ def liquidate(ust_recipient: address) -> uint256:
 
     steth_amount: uint256 = ERC20(STETH_TOKEN).balanceOf(self)
     assert steth_amount > 0, "zero stETH balance"
-
-    assert ERC20Decimals(UST_TOKEN).decimals() == 18
-    assert ERC20Decimals(STETH_TOKEN).decimals() == 18
 
     steth_anchor_price: uint256 = self._get_steth_anchor_price()
 
