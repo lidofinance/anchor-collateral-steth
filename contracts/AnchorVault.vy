@@ -75,6 +75,21 @@ event AnchorRewardsDistributorUpdated:
 
 BETH_DECIMALS: constant(uint256) = 18
 
+# A constant used in `_can_deposit_or_withdraw` when comparing Lido share prices.
+#
+# Due to integer rounding, Lido.getPooledEthByShares(10**18) may return slightly
+# different numbers even if there were no oracle reports between two calls. This
+# might happen if someone submits ETH before the second call. It can be mathematically
+# proven that this difference won't be more than 10 wei given that Lido holds at least
+# 0.1 ETH and the share price is of the same order of magnitude as the amount of ETH
+# held. Both of these conditions are true if Lido operates normally—and if it doesn't,
+# it's desirable for AnchorVault operations to be suspended. See:
+#
+# https://github.com/lidofinance/lido-dao/blob/eb33eb8/contracts/0.4.24/Lido.sol#L445
+# https://github.com/lidofinance/lido-dao/blob/eb33eb8/contracts/0.4.24/StETH.sol#L288
+#
+STETH_SHARE_PRICE_MAX_ERROR: constant(uint256) = 10
+
 
 admin: public(address)
 
@@ -253,7 +268,7 @@ def _diff_abs(new: uint256, old: uint256) -> uint256:
 @internal
 def _can_deposit_or_withdraw() -> bool:
     share_price: uint256 = Lido(self.steth_token).getPooledEthByShares(10**18)
-    return self._diff_abs(share_price, self.last_liquidation_share_price) <= 100
+    return self._diff_abs(share_price, self.last_liquidation_share_price) <= STETH_SHARE_PRICE_MAX_ERROR
 
 
 @view
