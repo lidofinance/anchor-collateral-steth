@@ -288,7 +288,7 @@ def can_deposit_or_withdraw() -> bool:
 
 @external
 @payable
-def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
+def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) -> (uint256, uint256):
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_token: address = self.steth_token
@@ -319,9 +319,11 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]):
 
     log Deposited(msg.sender, steth_amount_adj, _terra_address)
 
+    return (steth_amount_adj, beth_amount)
+
 
 @external
-def withdraw(_amount: uint256, _recipient: address = msg.sender):
+def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_rate: uint256 = self._get_rate(True)
@@ -331,6 +333,8 @@ def withdraw(_amount: uint256, _recipient: address = msg.sender):
     ERC20(self.steth_token).transfer(_recipient, steth_amount)
 
     log Withdrawn(_recipient, _amount)
+
+    return steth_amount
 
 
 @external
