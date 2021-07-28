@@ -121,8 +121,12 @@ def __init__(beth_token: address, steth_token: address, admin: address):
 
 @external
 def change_admin(new_admin: address):
+    """
+    @dev Changes the admin address. Can only be called by the current admin address.
+
+    Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
+    """
     assert msg.sender == self.admin # dev: unauthorized
-    # we're intentionally allowing to set admin to zero address for ossification purposes
     self.admin = new_admin
     log AdminChanged(new_admin)
 
@@ -135,6 +139,12 @@ def _set_bridge_connector(_bridge_connector: address):
 
 @external
 def set_bridge_connector(_bridge_connector: address):
+    """
+    @dev Sets the bridge connector contract: an adapter contract for communicating
+         with the Terra bridge.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_bridge_connector(_bridge_connector)
 
@@ -147,6 +157,11 @@ def _set_rewards_liquidator(_rewards_liquidator: address):
 
 @external
 def set_rewards_liquidator(_rewards_liquidator: address):
+    """
+    @dev Sets the rewards liquidator contract: a contract for selling stETH rewards to UST.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_rewards_liquidator(_rewards_liquidator)
 
@@ -159,6 +174,12 @@ def _set_insurance_connector(_insurance_connector: address):
 
 @external
 def set_insurance_connector(_insurance_connector: address):
+    """
+    @dev Sets the insurance connector contract: a contract for obtaining the total number of
+         shares burnt for the purpose of insurance/cover application from the Lido protocol.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_insurance_connector(_insurance_connector)
 
@@ -188,6 +209,13 @@ def set_liquidation_config(
     _no_liquidation_interval: uint256,
     _restricted_liquidation_interval: uint256,
 ):
+    """
+    @dev Sets the liquidation config consisting of liquidation admin, the address that is allowed
+         to sell stETH rewards to UST during after the no-liquidation interval ends and before
+         the restricted liquidation interval ends, as well as both intervals.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_liquidation_config(
         _liquidations_admin,
@@ -204,6 +232,12 @@ def _set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
 
 @external
 def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
+    """
+    @dev Sets the Terra-side UST rewards distributor contract allowing Terra-side bETH holders
+         to claim their staking rewards in the UST form.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
@@ -218,6 +252,11 @@ def configure(
     _restricted_liquidation_interval: uint256,
     _anchor_rewards_distributor: bytes32,
 ):
+    """
+    @dev A shortcut function for setting all admin-configurable settings at once.
+
+    Can only be called by the current admin address.
+    """
     assert msg.sender == self.admin # dev: unauthorized
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
@@ -251,6 +290,9 @@ def get_rate() -> uint256:
     """
     @dev How much bETH one receives for depositing one stETH, and how much bETH one needs
          to provide to withdraw one stETH, 10**18 being the 1:1 rate.
+
+    This rate is notmally 10**18 (1:1) but might be different after severe penalties inflicted
+    on the Lido validators.
     """
     return self._get_rate(False)
 
@@ -289,6 +331,22 @@ def can_deposit_or_withdraw() -> bool:
 @external
 @payable
 def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) -> (uint256, uint256):
+    """
+    @dev Locks the `_amount` of provided ETH or stETH tokens in return for bETH tokens
+         minted to the `_terra_address` address on the Terra blockchain.
+
+    When ETH is provided, it will be deposited to Lido and converted to stETH first.
+    In this case, transaction value must be the same as `_amount` argument.
+
+    To provide stETH, set the transavtion value to zero and approve this contract for spending
+    the `_amount` of stETH on your behalf.
+
+    The call fails if `AnchorVault.can_deposit_or_withdraw()` is false.
+
+    The conversion rate from stETH to bETH should normally be 1 but might be different after
+    severe penalties inflicted on the Lido validators. You can obtain the current conversion
+    rate by calling `AnchorVault.get_rate()`.
+    """
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_token: address = self.steth_token
@@ -324,6 +382,19 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) 
 
 @external
 def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
+    """
+    @dev Burns the `_amount` of provided Ethereum-side bETH tokens in return for stETH
+         tokens transferred to the `_recipient` Ethereum address.
+
+    To withdraw Terra-side bETH, you should firstly transfer the tokens to the Ethereum
+    blockchain.
+
+    The call fails if `AnchorVault.can_deposit_or_withdraw()` is false.
+
+    The conversion rate from stETH to bETH should normally be 1 but might be different after
+    severe penalties inflicted on the Lido validators. You can obtain the current conversion
+    rate by calling `AnchorVault.get_rate()`.
+    """
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_rate: uint256 = self._get_rate(True)
@@ -339,6 +410,10 @@ def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
 
 @external
 def collect_rewards() -> uint256:
+    """
+    @dev Sells stETH rewards and transfers them to the distributor contract in the
+         Terra blockchain.
+    """
     time_since_last_liquidation: uint256 = block.timestamp - self.last_liquidation_time
 
     if msg.sender == self.liquidations_admin:
