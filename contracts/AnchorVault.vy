@@ -431,7 +431,7 @@ def collect_rewards() -> uint256:
     else:
         assert time_since_last_liquidation > self.restricted_liquidation_interval # dev: too early to sell
 
-    # The code below sells all rewards accrued by stETH held in the vallet to UST
+    # The code below sells all rewards accrued by stETH held in the vault to UST
     # and forwards the outcome to the rewards distributor contract in Terra.
     #
     # To calculate the amount of rewards, we need to take the amount of stETH shares
