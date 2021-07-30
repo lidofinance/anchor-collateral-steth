@@ -90,6 +90,9 @@ BETH_DECIMALS: constant(uint256) = 18
 #
 STETH_SHARE_PRICE_MAX_ERROR: constant(uint256) = 10
 
+# WARNING: since this contract is behind a proxy, don't change the order of the variables
+# and don't remove variables during the code upgrades. You can only append new variables
+# to the end of the list.
 
 admin: public(address)
 
@@ -110,12 +113,19 @@ last_liquidation_shares_burnt: public(uint256)
 
 
 @external
-def __init__(beth_token: address, steth_token: address, admin: address):
+def initialize(beth_token: address, steth_token: address, admin: address):
+    assert self.beth_token == ZERO_ADDRESS # dev: already initialized
+    assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
+    assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
+
     assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
+
     self.beth_token = beth_token
     self.steth_token = steth_token
+    # we're explicitly allowing zero admin address for ossification
     self.admin = admin
     self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
+
     log AdminChanged(admin)
 
 

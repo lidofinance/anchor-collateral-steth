@@ -1,5 +1,5 @@
 import pytest
-from brownie import ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
+from brownie import Contract, ZERO_ADDRESS, chain, reverts, ETH_ADDRESS
 
 ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
 ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -13,7 +13,32 @@ NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
 RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 
-def test_deploy_fails_on_non_zero_beth_total_supply(
+def test_init_cannot_be_called_twice(beth_token, steth_token, deployer, admin, stranger, AnchorVault):
+    vault = AnchorVault.deploy({'from': deployer})
+
+    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+
+    with reverts('dev: already initialized'):
+        vault.initialize(beth_token, steth_token, admin, {'from': admin})
+
+
+def test_init_fails_on_zero_token_address(beth_token, steth_token, deployer, admin, AnchorVault):
+    vault = AnchorVault.deploy({'from': deployer})
+
+    with reverts('dev: invalid bETH address'):
+        vault.initialize(ZERO_ADDRESS, steth_token, admin, {'from': deployer})
+
+    with reverts('dev: invalid stETH address'):
+        vault.initialize(beth_token, ZERO_ADDRESS, admin, {'from': deployer})
+
+
+def test_init_fails_on_non_zero_beth_total_supply(
     beth_token,
     steth_token,
     admin,
@@ -22,8 +47,11 @@ def test_deploy_fails_on_non_zero_beth_total_supply(
 ):
     beth_token.set_minter(admin, {'from': admin})
     beth_token.mint(admin, 10**18, {'from': admin})
-    with reverts():
-        AnchorVault.deploy(beth_token, steth_token, admin, {'from': deployer})
+
+    vault = AnchorVault.deploy({'from': deployer})
+
+    with reverts('dev: non-zero bETH total supply'):
+        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
 
 
 @pytest.fixture(scope='module')
@@ -36,9 +64,17 @@ def vault(
     deployer,
     admin,
     liquidations_admin,
-    AnchorVault
+    AnchorVault,
+    AnchorVaultProxy
 ):
-    vault = AnchorVault.deploy(beth_token, steth_token, admin, {'from': deployer})
+    impl = AnchorVault.deploy({'from': deployer})
+    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
+
+    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
+    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
+
+    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+
     vault.configure(
         mock_bridge_connector,
         mock_rewards_liquidator,
@@ -49,7 +85,9 @@ def vault(
         ANCHOR_REWARDS_DISTRIBUTOR,
         {'from': admin}
     )
+
     beth_token.set_minter(vault, {'from': admin})
+
     return vault
 
 

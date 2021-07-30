@@ -1,3 +1,7 @@
+dependencies:
+  # we're using 4.0.0 since we don't need proxy beacon logic from 4.1.0
+  - OpenZeppelin/openzeppelin-contracts@4.0.0
+
 networks:
   default: development
   development:
