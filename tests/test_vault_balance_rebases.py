@@ -488,3 +488,34 @@ def test_shares_balance_decrease_liquidation(
         vault_steth_balance_before,
         100
     )
+
+
+def test_can_sell_rewards_on_zero_balance(
+    vault,
+    vault_user,
+    liquidations_admin,
+    deposit_to_terra,
+    steth_token,
+    beth_token,
+    helpers,
+    withdraw_from_terra,
+    lido_oracle_report
+):
+    chain.mine(timedelta=60*60*25)
+
+    tx = vault.collect_rewards({'from': liquidations_admin})
+
+    helpers.assert_single_event_named('RewardsCollected', tx, {
+        'steth_amount': 0,
+        'ust_amount': 0
+    })
+
+    chain.mine(timedelta=60*60*25)
+    lido_oracle_report(steth_rebase_mult=1.1)
+
+    tx = vault.collect_rewards({'from': liquidations_admin})
+
+    helpers.assert_single_event_named('RewardsCollected', tx, {
+        'steth_amount': 0,
+        'ust_amount': 0
+    })

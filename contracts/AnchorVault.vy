@@ -474,12 +474,12 @@ def collect_rewards() -> uint256:
 
     shares_burnt_since: uint256 = shares_burnt - prev_shares_burnt
     share_price_corrected: uint256 = (10**18 * total_pooled_eth) / (total_shares + shares_burnt_since)
+    shares_balance: uint256 = Lido(steth_token).sharesOf(self)
 
-    if share_price_corrected <= prev_share_price:
+    if share_price_corrected <= prev_share_price or shares_balance == 0:
         log RewardsCollected(0, 0)
         return 0
 
-    shares_balance: uint256 = Lido(steth_token).sharesOf(self)
     steth_to_sell: uint256 = shares_balance * (share_price_corrected - prev_share_price) / 10**18
 
     connector: address = self.bridge_connector
