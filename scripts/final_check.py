@@ -182,9 +182,15 @@ def main():
         terra_recipient = '0xabcdef1234abcdef1234abcdef1234abcdef1234000000000000000000000000'
         tx = vault.submit(2 * 10**18, terra_recipient, b'', {'from': holder_1})
         tx.info()
+
+        bridge_balance = beth_token.balanceOf(beth_shuttle_vault)
+
         assert beth_token.balanceOf(holder_1) == 0
-        assert beth_token.balanceOf(beth_shuttle_vault) > 1.999 * 10**18
-        assert beth_token.totalSupply() == beth_token.balanceOf(beth_shuttle_vault)
+        assert bridge_balance > 1.999 * 10**18
+        assert bridge_balance <= 2 * 10**18
+        assert beth_token.totalSupply() == bridge_balance
+
+        log.ok('bridge bETH balance', bridge_balance / 10**18)
 
         print()
         print('Submitting ETH...')
@@ -194,6 +200,11 @@ def main():
         tx = vault.submit(2 * 10**18, terra_recipient, b'', {'from': holder_1, 'value': 2 * 10**18})
         tx.info()
 
+        bridge_balance = beth_token.balanceOf(beth_shuttle_vault)
+
         assert beth_token.balanceOf(holder_2) == 0
-        assert beth_token.balanceOf(beth_shuttle_vault) > 2 * 1.999 * 10**18
-        assert beth_token.totalSupply() == beth_token.balanceOf(beth_shuttle_vault)
+        assert bridge_balance > 2 * 1.999 * 10**18
+        assert bridge_balance <= 4 * 10**18
+        assert beth_token.totalSupply() == bridge_balance
+
+        log.ok('bridge bETH balance', bridge_balance / 10**18)
