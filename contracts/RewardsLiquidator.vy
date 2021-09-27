@@ -178,25 +178,8 @@ def configure(
 
 @internal
 @view
-def _get_steth_eth_anchor_price() -> uint256:
-    round_id: uint256 = 0
-    answer: int256 = 0
-    started_at: uint256 = 0
-    updated_at: uint256 = 0
-    answered_in_round: uint256 = 0
-
-    (round_id, answer, started_at, updated_at, answered_in_round) = \
-        ChainlinkAggregatorV3Interface(CHAINLINK_STETH_ETH_FEED).latestRoundData()
-
-    assert updated_at != 0
-
-    return convert(answer, uint256)
-
-
-@internal
-@view
-def _get_eth_usdc_anchor_price() -> uint256:
-    eth_price_decimals: uint256 = ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USDC_FEED).decimals()
+def _get_anchor_price(chainlink_price_feed: address) -> uint256:
+    eth_price_decimals: uint256 = ChainlinkAggregatorV3Interface(chainlink_price_feed).decimals()
     assert 0 < eth_price_decimals and eth_price_decimals <= 18
 
     round_id: uint256 = 0
@@ -206,50 +189,10 @@ def _get_eth_usdc_anchor_price() -> uint256:
     answered_in_round: uint256 = 0
 
     (round_id, answer, started_at, updated_at, answered_in_round) = \
-        ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USDC_FEED).latestRoundData()
+        ChainlinkAggregatorV3Interface(chainlink_price_feed).latestRoundData()
 
     assert updated_at != 0
-
     return convert(answer, uint256) * (10 ** (18 - eth_price_decimals))
-
-@internal
-@view
-def _get_usdc_usd_anchor_price() -> uint256:
-    eth_price_decimals: uint256 = ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USDC_FEED).decimals()
-    assert 0 < eth_price_decimals and eth_price_decimals <= 18
-
-    round_id: uint256 = 0
-    answer: int256 = 0
-    started_at: uint256 = 0
-    updated_at: uint256 = 0
-    answered_in_round: uint256 = 0
-
-    (round_id, answer, started_at, updated_at, answered_in_round) = \
-        ChainlinkAggregatorV3Interface(CHAINLINK_ETH_USDC_FEED).latestRoundData()
-
-    assert updated_at != 0
-
-    return convert(answer, uint256) * (10 ** (18 - eth_price_decimals))
-
-@internal
-@view
-def _get_steth_usd_anchor_price() -> uint256:
-    eth_price_decimals: uint256 = ChainlinkAggregatorV3Interface(CHAINLINK_STETH_USD_FEED).decimals()
-    assert 0 < eth_price_decimals and eth_price_decimals <= 18
-
-    round_id: uint256 = 0
-    answer: int256 = 0
-    started_at: uint256 = 0
-    updated_at: uint256 = 0
-    answered_in_round: uint256 = 0
-
-    (round_id, answer, started_at, updated_at, answered_in_round) = \
-        ChainlinkAggregatorV3Interface(CHAINLINK_STETH_USD_FEED).latestRoundData()
-
-    assert updated_at != 0
-
-    return convert(answer, uint256) * (10 ** (18 - eth_price_decimals))
-
 
 @internal
 def _uniswap_v2_sell_eth_to_usdc(
@@ -320,7 +263,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert steth_amount > 0, "zero stETH balance"
 
     # steth -> eth
-    steth_eth_anchor_price: uint256 = self._get_steth_eth_anchor_price()
+    steth_eth_anchor_price: uint256 = self._get_anchor_price(CHAINLINK_STETH_ETH_FEED)
 
     min_eth_amount: uint256 = self._get_min_amount_out(
         steth_amount,
@@ -341,7 +284,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert self.balance >= eth_amount
 
     # eth -> usdc
-    eth_usdc_anchor_price: uint256 = self._get_eth_usdc_anchor_price()
+    eth_usdc_anchor_price: uint256 = self._get_anchor_price(CHAINLINK_ETH_USDC_FEED)()
 
     min_usdc_amount: uint256 = self._get_min_amount_out(
         eth_amount,
@@ -360,7 +303,7 @@ def liquidate(ust_recipient: address) -> uint256:
 
     # usdc -> ust
     # assuming the usd is almost the same as ust
-    usdc_usd_anchor_price: uint256 = self._get_usdc_usd_anchor_price()
+    usdc_usd_anchor_price: uint256 = self._get_anchor_price(CHAINLINK_USDC_USD_FEED)()
 
     min_ust_amount: uint256 = self._get_min_amount_out(
         usdc_amount,
@@ -381,7 +324,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20(UST_TOKEN).balanceOf(self) >= ust_amount
 
     # final overall check
-    steth_usd_anchor_price: uint256 = self._get_steth_usd_anchor_price()
+    steth_usd_anchor_price: uint256 = self._get_anchor_price(CHAINLINK_STETH_USD_FEED)()
     min_usd_amount: uint256 = self._get_min_amount_out(
         steth_amount,
         steth_usd_anchor_price,
