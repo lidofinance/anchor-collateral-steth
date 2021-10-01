@@ -59,7 +59,7 @@ CHAINLINK_USDC_USD_FEED: constant(address) = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA5
 CURVE_STETH_POOL: constant(address) = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022
 CURVE_UST_POOL: constant(address) = 0x890f4e345B1dAED0367A877a1612f86A1f86985f
 UNISWAP_ROUTER_V3: constant(address) = 0xE592427A0AEce92De3Edee1F18E0157C05861564
-UNISWAP_USDC_POOL_3_FEE: constant(uint256) = 500
+UNISWAP_USDC_POOL_3_FEE: constant(uint256) = 3000 # 0.3%
 
 CURVE_ETH_INDEX: constant(uint256) = 0
 CURVE_STETH_INDEX: constant(uint256) = 1
@@ -110,7 +110,7 @@ def __init__(
     self.admin = admin
     self.max_steth_eth_price_difference_percent = max_steth_eth_price_difference_percent
     self.max_eth_usdc_price_difference_percent = max_eth_usdc_price_difference_percent
-    self.max_usdc_ust_price_difference_percent = max_eth_usdc_price_difference_percent
+    self.max_usdc_ust_price_difference_percent = max_usdc_ust_price_difference_percent
     self.max_steth_ust_price_difference_percent = max_steth_ust_price_difference_percent
 
     log AdminChanged(self.admin)
