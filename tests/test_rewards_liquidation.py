@@ -269,7 +269,7 @@ def test_fails_on_excess_eth_usdc_price_change(interface, whale, steth_token, va
         (
             WETH_TOKEN,
             USDC_TOKEN,
-            UNISWAP_USDC_POOL_3_FEE,  # po  ol fee
+            UNISWAP_USDC_POOL_3_FEE,
             whale,  # recipient
             deadline,  # deadline
             liquidity_amount,  # amount_in,
