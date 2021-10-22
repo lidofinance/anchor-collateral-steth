@@ -13,19 +13,19 @@ next_nonce: uint256
 
 
 @internal
-def _transferAsset(asset: address, amount: uint256, recipient: bytes32):
+def _transferAsset(bridge: address, asset: address, amount: uint256, recipient: bytes32):
     nonce: uint256 = self.next_nonce
-    arbiter_fee: uint256 = 0 # TODO: figur out how to calculate and handle
+    arbiter_fee: uint256 = 0 # TODO: figure out how to calculate and handle
 
     self.next_nonce = nonce + 1
 
-    ERC20(asset).approve(WORMHOLE_TOKEN_BRIDGE, amount)
+    ERC20(asset).approve(bridge, amount)
 
     # Method signature: https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L93
     # Vyper does not support uint16 and uint32. Using raw_call() for compatibility.
     # TODO: need to check that low-level call succeeds.
     raw_call(
-        WORMHOLE_TOKEN_BRIDGE,
+        bridge,
         concat(
             method_id('transferTokens(address,uint256,uint16,bytes32,uint256,uint32)'),
             convert(asset, bytes32),
@@ -40,12 +40,12 @@ def _transferAsset(asset: address, amount: uint256, recipient: bytes32):
 
 @external
 def forward_beth(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transferAsset(BETH_TOKEN, _amount, _terra_address)
+    self._transferAsset(WORMHOLE_TOKEN_BRIDGE, BETH_TOKEN, _amount, _terra_address)
 
 
 @external
 def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transferAsset(UST_WRAPPER_TOKEN, _amount, _terra_address)
+    self._transferAsset(WORMHOLE_TOKEN_BRIDGE, UST_WRAPPER_TOKEN, _amount, _terra_address)
 
 
 @external
