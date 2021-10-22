@@ -3,21 +3,28 @@
 # @licence MIT
 from vyper.interfaces import ERC20
 
-WORMHOLE_TOKEN_BRIDGE: constant(address) = 0x6c4c12987303b2c94b2C76c612Fc5F4D2F0360F7
-BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
-UST_WRAPPER_TOKEN: constant(address) = ZERO_ADDRESS # TODO: set real address
-TERRA_CHAIN_ID: constant(uint256) = 3               # TODO: verify
+# WORMHOLE_TOKEN_BRIDGE: constant(address) = 0x6c4c12987303b2c94b2C76c612Fc5F4D2F0360F7
+# BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
+UST_WRAPPER_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
+TERRA_CHAIN_ID: constant(uint256) = 3
 
+wormhole_token_bridge: public(address)
+beth_token: public(address)
 
 next_nonce: uint256
 
+@external
+def __init__(wormhole_token_bridge: address, beth_token: address):
+    self.wormhole_token_bridge = wormhole_token_bridge
+    self.beth_token = beth_token
 
 @internal
 def _transferAsset(bridge: address, asset: address, amount: uint256, recipient: bytes32):
+    # @TODO: maybe we can get nonce from _extra_data
     nonce: uint256 = self.next_nonce
-    arbiter_fee: uint256 = 0 # TODO: figure out how to calculate and handle
-
     self.next_nonce = nonce + 1
+
+    arbiter_fee: uint256 = 0
 
     ERC20(asset).approve(bridge, amount)
 
@@ -40,12 +47,12 @@ def _transferAsset(bridge: address, asset: address, amount: uint256, recipient: 
 
 @external
 def forward_beth(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transferAsset(WORMHOLE_TOKEN_BRIDGE, BETH_TOKEN, _amount, _terra_address)
+    self._transferAsset(self.wormhole_token_bridge, self.beth_token, _amount, _terra_address)
 
 
 @external
 def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transferAsset(WORMHOLE_TOKEN_BRIDGE, UST_WRAPPER_TOKEN, _amount, _terra_address)
+    self._transferAsset(self.wormhole_token_bridge, UST_WRAPPER_TOKEN, _amount, _terra_address)
 
 
 @external
