@@ -3,51 +3,55 @@
 # @licence MIT
 from vyper.interfaces import ERC20
 
-
-# FIXME: use the actual values
-WORMHOLE: constant(address) = ZERO_ADDRESS
-BETH_TOKEN: constant(address) = ZERO_ADDRESS
-UST_WRAPPER_TOKEN: constant(address) = ZERO_ADDRESS
-TERRA_CHAIN_ID: constant(uint256) = 3
+WORMHOLE_TOKEN_BRIDGE: constant(address) = 0x6c4c12987303b2c94b2C76c612Fc5F4D2F0360F7
+BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
+UST_WRAPPER_TOKEN: constant(address) = ZERO_ADDRESS # TODO: set real address
+TERRA_CHAIN_ID: constant(uint256) = 3               # TODO: verify
 
 
 next_nonce: uint256
 
 
 @internal
-def _lockAssets(_asset: address, _amount: uint256, _recipient: bytes32):
+def _transferAsset(asset: address, amount: uint256, recipient: bytes32):
     nonce: uint256 = self.next_nonce
+    arbiter_fee: uint256 = 0 # TODO: figur out how to calculate and handle
+
     self.next_nonce = nonce + 1
 
-    ERC20(_asset).approve(WORMHOLE, _amount)
+    ERC20(asset).approve(WORMHOLE_TOKEN_BRIDGE, amount)
 
+    # Method signature: https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L93
+    # Vyper does not support uint16 and uint32. Using raw_call() for compatibility.
+    # TODO: need to check that low-level call succeeds.
     raw_call(
-        WORMHOLE,
+        WORMHOLE_TOKEN_BRIDGE,
         concat(
-            method_id('lockAssets(address,uint256,bytes32,uint8,uint32,bool)'),
-            convert(_asset, bytes32),
-            convert(_amount, bytes32),
-            _recipient,
+            method_id('transferTokens(address,uint256,uint16,bytes32,uint256,uint32)'),
+            convert(asset, bytes32),
+            convert(amount, bytes32),
             convert(TERRA_CHAIN_ID, bytes32),
-            convert(nonce, bytes32),
-            convert(False, bytes32)
+            recipient,
+            convert(arbiter_fee, bytes32),
+            convert(nonce, bytes32)
         )
     )
 
 
 @external
 def forward_beth(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._lockAssets(BETH_TOKEN, _amount, _terra_address)
+    self._transferAsset(BETH_TOKEN, _amount, _terra_address)
 
 
 @external
 def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._lockAssets(UST_WRAPPER_TOKEN, _amount, _terra_address)
+    self._transferAsset(UST_WRAPPER_TOKEN, _amount, _terra_address)
 
 
 @external
 @view
 def adjust_amount(_amount: uint256, _decimals: uint256) -> uint256:
     # Wormhole only supports the precision of 9 decimals
+    # TODO: verify that this is true for Wormhole v2
     mult: uint256 = 10 ** (_decimals - 9)
     return (_amount / mult) * mult
