@@ -35,8 +35,7 @@ def _transfer_asset(bridge: address, asset: address, amount: uint256, recipient:
 
     # Method signature: https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L93
     # Vyper does not support uint16 and uint32. Using raw_call() for compatibility.
-    # TODO: figure out how to check that low-level call succeeds.
-    result: Bytes[32] = raw_call(
+    raw_call(
         bridge,
         concat(
             method_id('transferTokens(address,uint256,uint16,bytes32,uint256,uint32)'),
@@ -46,8 +45,7 @@ def _transfer_asset(bridge: address, asset: address, amount: uint256, recipient:
             recipient,
             convert(arbiter_fee, bytes32),
             convert(nonce, bytes32)
-        ),
-        max_outsize=32
+        )
     )
 
 
