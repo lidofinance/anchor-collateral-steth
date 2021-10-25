@@ -1,10 +1,13 @@
 import pytest
-from brownie import ZERO_ADDRESS
+from brownie import ZERO_ADDRESS, Contract
 
 
 BETH_DECIMALS = 18
 UST_TOKEN = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
 
+ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
+NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
+RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 @pytest.fixture(scope='function', autouse=True)
 def shared_setup(fn_isolation):
@@ -72,6 +75,43 @@ def ust_token(interface):
 @pytest.fixture(scope='module')
 def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
+
+@pytest.fixture(scope='module')
+def vault(
+    beth_token,
+    steth_token,
+    bridge_connector,
+    mock_rewards_liquidator,
+    mock_insurance_connector,
+    deployer,
+    admin,
+    liquidations_admin,
+    AnchorVault,
+    AnchorVaultProxy
+):
+    impl = AnchorVault.deploy({'from': deployer})
+    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
+
+    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
+
+    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
+
+    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+
+    vault.configure(
+        bridge_connector,
+        mock_rewards_liquidator,
+        mock_insurance_connector,
+        liquidations_admin,
+        NO_LIQUIDATION_INTERVAL,
+        RESTRICTED_LIQUIDATION_INTERVAL,
+        ANCHOR_REWARDS_DISTRIBUTOR,
+        {'from': admin}
+    )
+
+    beth_token.set_minter(vault, {'from': admin})
+
+    return vault
 
 
 @pytest.fixture(scope='module')

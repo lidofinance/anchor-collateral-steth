@@ -1,11 +1,7 @@
 import pytest
 from brownie import Contract, ZERO_ADDRESS
 
-ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
-
-NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
-RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 @pytest.fixture(scope='module')
 def bridge_connector(
@@ -22,45 +18,7 @@ def bridge_connector(
         {'from': deployer}
     )
 
-@pytest.fixture(scope='module')
-def vault(
-    beth_token,
-    steth_token,
-    bridge_connector,
-    mock_rewards_liquidator,
-    mock_insurance_connector,
-    deployer,
-    admin,
-    liquidations_admin,
-    AnchorVault,
-    AnchorVaultProxy
-):
-    impl = AnchorVault.deploy({'from': deployer})
-    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
-
-    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
-
-    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
-
-    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
-
-    vault.configure(
-        bridge_connector,
-        mock_rewards_liquidator,
-        mock_insurance_connector,
-        liquidations_admin,
-        NO_LIQUIDATION_INTERVAL,
-        RESTRICTED_LIQUIDATION_INTERVAL,
-        ANCHOR_REWARDS_DISTRIBUTOR,
-        {'from': admin}
-    )
-
-    beth_token.set_minter(vault, {'from': admin})
-
-    return vault
-
-
-def test_forward_beth(
+def test_anchor_vault_submit(
     vault, 
     vault_user, 
     beth_token,
@@ -82,3 +40,52 @@ def test_forward_beth(
         'arbiterFee': 0, 
         'nonce': 0,
     })
+
+
+def test_forward_beth(
+    vault, 
+    vault_user, 
+    beth_token, 
+    helpers,
+    bridge_connector,
+    mock_wormhole_token_bridge
+):
+    amount = 1 * 10**18
+    tx = bridge_connector.forward_beth(TERRA_ADDRESS, amount, b'')
+    helpers.assert_single_event_named('WormholeTransfer', tx, source=mock_wormhole_token_bridge, evt_keys_dict={
+        'token': beth_token.address, 
+        'amount': amount, 
+        'recipientChain': 3, 
+        'recipient': TERRA_ADDRESS, 
+        'arbiterFee': 0, 
+        'nonce': 0,
+    })
+
+
+def test_forward_ust(
+    ust_token,
+    helpers,
+    bridge_connector,
+    mock_wormhole_token_bridge
+):
+    amount = 1 * 10**18
+    tx = bridge_connector.forward_ust(TERRA_ADDRESS, amount, b'')
+    helpers.assert_single_event_named('WormholeTransfer', tx, source=mock_wormhole_token_bridge, evt_keys_dict={
+        'token': ust_token.address, 
+        'amount': amount, 
+        'recipientChain': 3, 
+        'recipient': TERRA_ADDRESS, 
+        'arbiterFee': 0, 
+        'nonce': 0,
+    })
+
+
+def test_adjust_amount(
+    helpers,
+    bridge_connector,
+    mock_wormhole_token_bridge
+):
+    decimals = 18
+    amount = 1 * 10**decimals
+    adjusted_amount = bridge_connector.adjust_amount(amount, decimals)
+    assert adjusted_amount == amount
