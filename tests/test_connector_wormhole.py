@@ -9,17 +9,16 @@ RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 @pytest.fixture(scope='module')
 def bridge_connector(
-    beth_token, 
-    ust_token, 
+    beth_token,  
+    ust_token,
     mock_wormhole_token_bridge, 
     deployer, 
-    vault_user, 
-    admin,
     BridgeConnectorWormhole
 ):
     return BridgeConnectorWormhole.deploy(
         mock_wormhole_token_bridge, 
         beth_token,
+        ust_token,
         {'from': deployer}
     )
 
@@ -40,6 +39,7 @@ def vault(
     impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
 
     proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
+
     vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
     vault.initialize(beth_token, steth_token, admin, {'from': deployer})
@@ -59,17 +59,19 @@ def vault(
 
     return vault
 
-def test_transfer_tokens_raw_call(
+
+def test_forward_beth(
     vault, 
     vault_user, 
     beth_token,
     steth_token, 
     helpers,
-    mock_wormhole_token_bridge,
-    bridge_connector
+    mock_wormhole_token_bridge
 ):
     amount = 1 * 10**18
+
     steth_token.approve(vault, amount, {'from': vault_user})
+
     tx = vault.submit(amount, TERRA_ADDRESS, b'', {'from': vault_user})
 
     helpers.assert_single_event_named('WormholeTransfer', tx, source=mock_wormhole_token_bridge, evt_keys_dict={

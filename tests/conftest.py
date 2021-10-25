@@ -78,6 +78,7 @@ def beth_token(deployer, admin, bEth):
 def mock_bridge(accounts):
     return accounts.add()
 
+
 @pytest.fixture(scope='module')
 def mock_wormhole_token_bridge(deployer, MockWormholeTokenBridge):
     return MockWormholeTokenBridge.deploy({'from': deployer})
