@@ -64,6 +64,9 @@ def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[10
 def adjust_amount(_amount: uint256, _decimals: uint256) -> uint256:
     # Wormhole only supports the precision of 8 decimals
     # See https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L113
-    mult: uint256 = 10 ** (_decimals - 8)
+    if _decimals > 8:
+        mult: uint256 = 10 ** (_decimals - 8)
 
-    return (_amount / mult) * mult
+        return (_amount / mult) * mult
+
+    return _amount

@@ -43,8 +43,6 @@ def test_anchor_vault_submit(
 
 
 def test_forward_beth(
-    vault, 
-    vault_user, 
     beth_token, 
     helpers,
     bridge_connector,
@@ -79,13 +77,18 @@ def test_forward_ust(
         'nonce': 0,
     })
 
-
+@pytest.mark.parametrize(
+    'amount,decimals,expected',
+    [
+        (11111111111111111111, 18, 11111111110000000000),
+        (12345678901234567890, 10, 12345678901234567800),
+        (12345678901234567890, 5, 12345678901234567890),
+    ]
+)
 def test_adjust_amount(
-    helpers,
-    bridge_connector,
-    mock_wormhole_token_bridge
+    amount,
+    decimals,
+    expected,
+    bridge_connector
 ):
-    decimals = 18
-    amount = 1 * 10**decimals
-    adjusted_amount = bridge_connector.adjust_amount(amount, decimals)
-    assert adjusted_amount == amount
+    assert bridge_connector.adjust_amount(amount, decimals) == expected
