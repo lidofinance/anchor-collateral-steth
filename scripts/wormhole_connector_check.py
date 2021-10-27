@@ -38,7 +38,7 @@ def main():
 
     print()
 
-    log.ok('AnchorVault')
+    log.ok('AnchorVault', vault.address)
     assert_equals('  admin', vault.admin(), dev_multisig)
     assert_equals('  beth_token', vault.beth_token(), beth_token.address)
     assert_equals('  steth_token', vault.steth_token(), steth_token.address)
@@ -51,7 +51,7 @@ def main():
     bridge_connector_wormhole = BridgeConnectorWormhole.deploy(token_bridge_wormhole, {'from': dev_multisig})
 
     log.ok('Wormhole bridge connector', bridge_connector_wormhole.address)
-    assert_equals('  bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)
+    assert_equals('  wormhole_token_bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)
 
     print()
 
@@ -60,6 +60,6 @@ def main():
     tx = vault.set_bridge_connector(bridge_connector_wormhole.address, {'from': dev_multisig})
     tx.info()
 
-    log.ok('AnchorVault')
-    assert_equals('  vault connector', vault.bridge_connector(), bridge_connector_wormhole.address)
+    log.ok('AnchorVault', vault.address)
+    assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
     # TODO: By some reason same is not applied to vault_impl. It such behavior correct?
