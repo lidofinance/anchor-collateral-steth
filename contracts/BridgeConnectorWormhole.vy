@@ -9,6 +9,8 @@ UST_WRAPPER_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661ac
 TERRA_CHAIN_ID: constant(uint256) = 3
 ARBITER_FEE: constant(uint256) = 0
 
+MAX_UINT32: constant(uint256) = 4294967295
+
 wormhole_token_bridge: public(address)
 
 next_nonce: uint256
@@ -20,10 +22,14 @@ def __init__(wormhole_token_bridge: address):
 
 @internal
 def _get_nonce() -> uint256:
-    # @TODO: maybe we can get nonce from _extra_data
     nonce: uint256 = self.next_nonce
 
-    self.next_nonce = nonce + 1
+    # Handling case when nonce is out of uint32 range.
+    # Otherwise receiving contract will revert due to decoding issue.
+    if nonce == MAX_UINT32:
+        self.next_nonce = 0
+    else:
+        self.next_nonce = nonce + 1
 
     return nonce
 
