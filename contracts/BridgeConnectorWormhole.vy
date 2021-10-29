@@ -23,11 +23,13 @@ def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipi
     arbiter_fee: uint256 = 0
 
     # TODO: Discuss if making first 64 bytes as required will break anything
-    if len(_extra_data) >= 64:
+    if len(_extra_data) >= 32:
         nonce = extract32(_extra_data, 0, output_type=uint256)
-        arbiter_fee = extract32(_extra_data, 32, output_type=uint256)
 
-        assert nonce <= 4294967295, "nonce exceeds size of 4 bytes"
+        assert nonce <= 4294967295, "nonce exceeds size of uint32 (4 bytes)"
+
+    if len(_extra_data) >= 64:
+        arbiter_fee = extract32(_extra_data, 32, output_type=uint256)
 
     ERC20(_asset).approve(_bridge, _amount)
 

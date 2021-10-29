@@ -1,5 +1,5 @@
 import pytest
-from brownie import Contract, ZERO_ADDRESS
+from brownie import reverts
 
 TERRA_CHAIN_ID = 3
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -58,7 +58,7 @@ def test_anchor_vault_submit(
         ),
         (
             100,
-            '0x00000000000000000000000000000000000000000000000000000000ffffffff0000000000000000000000000000000000000000000000000000000000000000',
+            '0x00000000000000000000000000000000000000000000000000000000ffffffff',
             100,
             0,
             4294967295
@@ -73,7 +73,7 @@ def test_anchor_vault_submit(
         (0, '', 0, 0, 0),
     ]
 )
-def test_forward_beth(
+def test_forward_beth_positive(
     helpers,
     bridge_connector,
     mock_wormhole_token_bridge,
@@ -96,6 +96,28 @@ def test_forward_beth(
 
 
 @pytest.mark.parametrize(
+    'amount,extra_data',
+    [
+        (
+            1 * 10**18,
+            '0x000000000000000000000000000000000000000000000000000000ffffffffff',
+        ),
+        (
+            1 * 10**18,
+            '0x0000000000000000000000000000000000000000000000000000001000000000',
+        ),
+    ]
+)
+def test_forward_beth_negative(
+    bridge_connector,
+    amount,
+    extra_data,
+):
+    with reverts('nonce exceeds size of uint32 (4 bytes)'):
+        bridge_connector.forward_beth(TERRA_ADDRESS, amount, extra_data)
+
+
+@pytest.mark.parametrize(
     'amount,extra_data,expected_amount,expected_arbiter_fee,expected_nonce',
     [
         (
@@ -114,7 +136,7 @@ def test_forward_beth(
         ),
         (
             100,
-            '0x00000000000000000000000000000000000000000000000000000000ffffffff0000000000000000000000000000000000000000000000000000000000000000',
+            '0x00000000000000000000000000000000000000000000000000000000ffffffff',
             100,
             0,
             4294967295
@@ -129,7 +151,7 @@ def test_forward_beth(
         (0, '', 0, 0, 0),
     ]
 )
-def test_forward_ust(
+def test_forward_ust_positive(
     ust_token,
     helpers,
     bridge_connector,
@@ -150,6 +172,27 @@ def test_forward_ust(
         'arbiterFee': expected_arbiter_fee,
         'nonce': expected_nonce,
     })
+
+@pytest.mark.parametrize(
+    'amount,extra_data',
+    [
+        (
+            1 * 10**18,
+            '0x000000000000000000000000000000000000000000000000000000ffffffffff',
+        ),
+        (
+            1 * 10**18,
+            '0x0000000000000000000000000000000000000000000000000000001000000000',
+        ),
+    ]
+)
+def test_forward_ust_negative(
+    bridge_connector,
+    amount,
+    extra_data,
+):
+    with reverts('nonce exceeds size of uint32 (4 bytes)'):
+        bridge_connector.forward_ust(TERRA_ADDRESS, amount, extra_data)
 
 @pytest.mark.parametrize(
     'amount,decimals,expected',
