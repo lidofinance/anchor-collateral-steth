@@ -28,7 +28,6 @@ def main():
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
     bridge_connector_shuttle = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
     token_bridge_wormhole = interface.Bridge('0x3ee18B2214AFF97000D974cf647E7C347E8fa585')
-    wormhole = interface.Wormhole('0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B')
 
     log.ok('dev multisig', dev_multisig)
 
@@ -99,6 +98,15 @@ def main():
         
         print('Selling rewards...')
 
+        burner = accounts.add()
+        voting_app = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
+        acl = interface.ACL('0x9895F0F17cc1d1891b6f18ee0b483B6f221b37Bb')
+        acl.grantPermission(burner, steth_token, steth_token.BURN_ROLE(), {'from': voting_app})
+
+        steth_token.burnShares(holder_1, steth_token.getSharesByPooledEth(1 * 5**18), {'from': burner})
+
         tx = vault.collect_rewards({'from': liquidations_admin})
         tx.info()
-        # @TODO: get to collect_rewards() stage when it calls forward_ust()
+
+        assert 'LogMessagePublished' in tx.events
+        assert tx.events['LogMessagePublished']['payload'] == '0x01000000000000000000000000000000000000000000000000000000000001862f000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd00022c4ab12675bccba793170e21285f8793611135df00000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000'
