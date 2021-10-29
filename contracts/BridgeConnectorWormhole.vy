@@ -7,13 +7,10 @@ BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
 UST_WRAPPER_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
 
 TERRA_CHAIN_ID: constant(uint256) = 3
-ARBITER_FEE: constant(uint256) = 0
 
 MAX_UINT32: constant(uint256) = 4294967295
 
 wormhole_token_bridge: public(address)
-
-next_nonce: uint256
 
 @external
 def __init__(wormhole_token_bridge: address):
@@ -21,33 +18,29 @@ def __init__(wormhole_token_bridge: address):
 
 
 @internal
-def _get_nonce() -> uint256:
-    nonce: uint256 = self.next_nonce
+def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipient: bytes32, _extra_data: Bytes[1024]):
+    nonce: uint256 = 0
+    arbiter_fee: uint256 = 0
 
-    # Handling case when nonce is out of uint32 range.
-    # Otherwise receiving contract will revert due to decoding issue.
-    if nonce == MAX_UINT32:
-        self.next_nonce = 0
-    else:
-        self.next_nonce = nonce + 1
+    # TODO: Discuss if making first 64 bytes as required will break anything
+    if len(_extra_data) >= 64:
+        nonce = extract32(_extra_data, 0, output_type=uint256)
+        arbiter_fee = extract32(_extra_data, 32, output_type=uint256)
 
-    return nonce
+        assert nonce <= 4294967295, "nonce exceeds size of 4 bytes"
 
-
-@internal
-def _transfer_asset(bridge: address, asset: address, amount: uint256, recipient: bytes32, arbiter_fee: uint256, nonce: uint256):
-    ERC20(asset).approve(bridge, amount)
+    ERC20(_asset).approve(_bridge, _amount)
 
     # Method signature: https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L93
     # Vyper does not support uint16 and uint32. Using raw_call() for compatibility.
     raw_call(
-        bridge,
+        _bridge,
         concat(
             method_id('transferTokens(address,uint256,uint16,bytes32,uint256,uint32)'),
-            convert(asset, bytes32),
-            convert(amount, bytes32),
+            convert(_asset, bytes32),
+            convert(_amount, bytes32),
             convert(TERRA_CHAIN_ID, bytes32),
-            recipient,
+            _recipient,
             convert(arbiter_fee, bytes32),
             convert(nonce, bytes32)
         )
@@ -56,12 +49,12 @@ def _transfer_asset(bridge: address, asset: address, amount: uint256, recipient:
 
 @external
 def forward_beth(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transfer_asset(self.wormhole_token_bridge, BETH_TOKEN, _amount, _terra_address, ARBITER_FEE, self._get_nonce())
+    self._transfer_asset(self.wormhole_token_bridge, BETH_TOKEN, _amount, _terra_address, _extra_data)
 
 
 @external
 def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
-    self._transfer_asset(self.wormhole_token_bridge, UST_WRAPPER_TOKEN, _amount, _terra_address, ARBITER_FEE, self._get_nonce())
+    self._transfer_asset(self.wormhole_token_bridge, UST_WRAPPER_TOKEN, _amount, _terra_address, _extra_data)
 
 
 @external
