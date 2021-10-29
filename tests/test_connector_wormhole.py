@@ -16,6 +16,7 @@ def bridge_connector(
         {'from': deployer}
     )
 
+
 def test_anchor_vault_submit(
     vault, 
     vault_user, 
@@ -173,6 +174,7 @@ def test_forward_ust_positive(
         'nonce': expected_nonce,
     })
 
+
 @pytest.mark.parametrize(
     'amount,extra_data',
     [
@@ -193,6 +195,7 @@ def test_forward_ust_negative(
 ):
     with reverts('nonce exceeds size of uint32 (4 bytes)'):
         bridge_connector.forward_ust(TERRA_ADDRESS, amount, extra_data)
+
 
 @pytest.mark.parametrize(
     'amount,decimals,expected',
