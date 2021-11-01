@@ -1,13 +1,24 @@
-from brownie import interface, accounts, network, Contract, ZERO_ADDRESS
+from brownie import interface, accounts, Contract, ZERO_ADDRESS
 from brownie import (
     bEth,
     AnchorVault,
     AnchorVaultProxy,
     BridgeConnectorShuttle,
-    BridgeConnectorWormhole,
+)
+
+from scripts.deploy_wormhole_connector import (
+    deploy_wormhole_bridge_connector,
+    switch_bridge_connector_in_vault,
 )
 
 import utils.log as log
+
+from utils.config import (
+    get_is_live,
+    token_bridge_wormhole_address,
+    vault_proxy_address
+)
+
 from utils.mainnet_fork import chain_snapshot
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -19,15 +30,17 @@ def assert_equals(desc, actual, expected):
 
 def main():
     dev_multisig = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
-
-    vault_proxy = AnchorVaultProxy.at('0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf')
-    vault_impl = AnchorVault.at('0x0627054d17eAe63ec23C6d8b07d8Db7A66ffd45a')
+    
+    vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
     beth_token = bEth.at('0x707F9118e33A9B8998beA41dd0d46f38bb963FC8')
     ust_token = interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
     bridge_connector_shuttle = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
-    token_bridge_wormhole = interface.Bridge('0x3ee18B2214AFF97000D974cf647E7C347E8fa585')
+    token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)
+
+    # Needed to properly decode LogMessagePublished events of Wormhole bridge
+    wormhole = interface.Wormhole('0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B')
 
     log.ok('dev multisig', dev_multisig)
 
@@ -47,9 +60,14 @@ def main():
 
     print()
 
+    if get_is_live():
+        print('Running on a live network, cannot run further checks.')
+        print('Run on a mainnet fork to do this.')
+        return
+
     print('Deploying BridgeConnectorWormhole...')
 
-    bridge_connector_wormhole = BridgeConnectorWormhole.deploy(token_bridge_wormhole, {'from': dev_multisig})
+    bridge_connector_wormhole = deploy_wormhole_bridge_connector(token_bridge_wormhole.address, {'from': dev_multisig})
 
     log.ok('Wormhole bridge connector', bridge_connector_wormhole.address)
     assert_equals('  wormhole_token_bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)
@@ -58,14 +76,12 @@ def main():
 
     print('Changing bridge connector on vault...')
 
-    tx = vault.set_bridge_connector(bridge_connector_wormhole.address, {'from': dev_multisig})
-    tx.info()
+    switch_bridge_connector_in_vault(vault, bridge_connector_wormhole, {'from': dev_multisig})
 
     log.ok('AnchorVault', vault.address)
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
 
     with chain_snapshot():
-        dev_multisig_acct = accounts.at(dev_multisig, force=True)
         liquidations_admin = accounts.at('0x1A9967A7b0c3dd39962296E53F5cf56471385dF2', force=True)
 
         print()
@@ -109,4 +125,4 @@ def main():
         tx.info()
 
         assert 'LogMessagePublished' in tx.events
-        assert tx.events['LogMessagePublished']['payload'] == '0x01000000000000000000000000000000000000000000000000000000000001862f000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd00022c4ab12675bccba793170e21285f8793611135df00000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000'
+        assert tx.events['LogMessagePublished']['payload'] == '0x01000000000000000000000000000000000000000000000000000000000001691a000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd00022c4ab12675bccba793170e21285f8793611135df00000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000'
