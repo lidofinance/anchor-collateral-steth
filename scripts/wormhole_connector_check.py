@@ -111,7 +111,7 @@ def main():
         log.ok('bridge bETH balance', bridge_balance / 10**18)
 
         print()
-        
+
         print('Selling rewards...')
 
         burner = accounts.add()
