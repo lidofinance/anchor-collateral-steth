@@ -1,4 +1,4 @@
-# @version 0.2.15
+# @version 0.3.0
 # @author skozin <info@lido.fi>
 # @licence MIT
 from vyper.interfaces import ERC20
@@ -15,8 +15,9 @@ interface ChainlinkAggregatorV3Interface:
 
 
 interface CurvePool:
-    def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256) -> uint256: payable
+
+interface CurveMetaPool:
     def exchange_underlying(i: int128, j: int128, dx: uint256, min_dy: uint256) -> uint256: nonpayable
 
 
@@ -52,9 +53,8 @@ WETH_TOKEN_DECIMALS: constant(uint256) = 18
 
 
 CHAINLINK_STETH_ETH_FEED: constant(address) = 0x86392dC19c0b719886221c78AB11eb8Cf5c52812
-CHAINLINK_STETH_USD_FEED: constant(address) = 0xCfE54B5cD566aB89272946F602D76Ea879CAb4a8 #for final check
-CHAINLINK_ETH_USD_FEED: constant(address) = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
-CHAINLINK_USDC_USD_FEED: constant(address) = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6
+CHAINLINK_UST_ETH_FEED: constant(address) = 0xa20623070413d42a5C01Db2c8111640DD7A5A03a
+CHAINLINK_USDC_ETH_FEED: constant(address) = 0x986b5E1e1755e3C2440e960477f25201B0a8bbD4
 
 CURVE_STETH_POOL: constant(address) = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022
 CURVE_UST_POOL: constant(address) = 0x890f4e345B1dAED0367A877a1612f86A1f86985f
@@ -164,7 +164,7 @@ def configure(
 
 @internal
 @view
-def _get_chainlink_price(chainlink_price_feed: address) -> uint256:
+def _get_chainlink_price(chainlink_price_feed: address, reverse: bool = False) -> uint256:
     price_decimals: uint256 = ChainlinkAggregatorV3Interface(chainlink_price_feed).decimals()
     assert 0 < price_decimals and price_decimals <= 18
 
@@ -178,8 +178,16 @@ def _get_chainlink_price(chainlink_price_feed: address) -> uint256:
         ChainlinkAggregatorV3Interface(chainlink_price_feed).latestRoundData()
 
     assert updated_at != 0
+    if reverse:
+        return  (10 ** (18 + price_decimals)) / convert(answer, uint256)
     return convert(answer, uint256) * (10 ** (18 - price_decimals))
 
+
+@internal
+@view
+def _get_chainlink_cross_price(priceA: uint256, priceB: uint256) -> uint256:
+    return (priceA * priceB) / (10 ** 18)
+    
 
 @internal
 def _uniswap_v3_sell_eth_to_usdc(
@@ -220,7 +228,7 @@ def _get_min_amount_out(
     return (amount_out * min_mult) / (10 ** (36 - decimal_token_out)) # = ((amount_out * min_mult) / 10**18) / (10 ** (18 - decimal_token_out))
 
 # 1) stETH -> ETH (Curve)
-# 2) ETH -> USDC (Uniswap v2)
+# 2) ETH -> USDC (Uniswap v3)
 # 3) USDC -> UST (Curve)
 @external
 def liquidate(ust_recipient: address) -> uint256:
@@ -230,7 +238,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert steth_amount > 0, "zero stETH balance"
 
     # steth -> eth
-    steth_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_STETH_ETH_FEED)
+    steth_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_STETH_ETH_FEED, False)
     min_eth_amount: uint256 = self._get_min_amount_out(
         steth_amount,
         steth_eth_price,
@@ -251,8 +259,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert self.balance >= eth_amount, "ETH balance mismatch"
 
     # eth -> usdc
-    # assuming the USDC rate is almost the same as USD, due to the lack of the ETH/USDC feed
-    eth_usdc_price: uint256 = self._get_chainlink_price(CHAINLINK_ETH_USD_FEED)
+    eth_usdc_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED, True)
     min_usdc_amount: uint256 = self._get_min_amount_out(
         eth_amount,
         eth_usdc_price,
@@ -271,11 +278,12 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20(USDC_TOKEN).balanceOf(self) >= usdc_amount, "USDC balance mismatch"
 
     # usdc -> ust
-    # assuming the UST rate is almost the same as USD, due to the lack of the USDC/UST feed
-    usdc_ust_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_USD_FEED)
+    usdc_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED, False)
+    eth_ust_price: uint256 = self._get_chainlink_price(CHAINLINK_UST_ETH_FEED, True)
+    usdc_ust_price: uint256 = self._get_chainlink_cross_price(usdc_eth_price, eth_ust_price)
     min_ust_amount: uint256 = self._get_min_amount_out(
         usdc_amount,
-        self._get_chainlink_price(CHAINLINK_USDC_USD_FEED),
+        usdc_ust_price,
         self.max_usdc_ust_price_difference_percent,
         USDC_TOKEN_DECIMALS,
         UST_TOKEN_DECIMALS
@@ -283,7 +291,7 @@ def liquidate(ust_recipient: address) -> uint256:
 
     ERC20(USDC_TOKEN).approve(CURVE_UST_POOL, usdc_amount)
 
-    ust_amount: uint256 = CurvePool(CURVE_UST_POOL).exchange_underlying(
+    ust_amount: uint256 = CurveMetaPool(CURVE_UST_POOL).exchange_underlying(
         CURVE_USDC_INDEX,
         CURVE_UST_INDEX,
         usdc_amount,
@@ -294,7 +302,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20(UST_TOKEN).balanceOf(self) >= ust_amount, "UST balance mismatch"
 
     # final overall check
-    steth_ust_price: uint256 = self._get_chainlink_price(CHAINLINK_STETH_USD_FEED)
+    steth_ust_price: uint256 = self._get_chainlink_cross_price(steth_eth_price, eth_ust_price)
     min_ust_amount = self._get_min_amount_out(
         steth_amount,
         steth_ust_price,
