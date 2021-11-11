@@ -104,8 +104,18 @@ def test_init(RewardsLiquidator, deployer, admin, mock_vault, helpers):
 
     tx_events = _decode_logs(liquidator.tx.logs)
 
+    assert "PoolsChanged" in tx_events
     assert "PriceDifferenceChanged" in tx_events
     assert "AdminChanged" in tx_events
+ 
+    assert tx_events["PoolsChanged"]["curve_steth_pool"] == CURVE_STETH_POOL
+    assert tx_events["PoolsChanged"]["curve_ust_pool"] == CURVE_UST_POOL
+    assert tx_events["PoolsChanged"]["uniswap_router_v3"] == UNISWAP_ROUTER_V3
+    assert tx_events["PoolsChanged"]["uniswap_usdc_pool_fee"] == UNISWAP_USDC_POOL_3_FEE
+    assert tx_events["PoolsChanged"]["curve_eth_index"] == CURVE_ETH_INDEX
+    assert tx_events["PoolsChanged"]["curve_steth_index"] == CURVE_STETH_INDEX
+    assert tx_events["PoolsChanged"]["curve_usdc_index"] == CURVE_USDC_INDEX
+    assert tx_events["PoolsChanged"]["curve_ust_index"] == CURVE_UST_INDEX
 
     assert tx_events["PriceDifferenceChanged"]["max_steth_eth_price_difference_percent"] == max_steth_eth_diff
     assert tx_events["PriceDifferenceChanged"]["max_eth_usdc_price_difference_percent"] == max_eth_usdc_diff

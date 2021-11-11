@@ -115,11 +115,10 @@ def main():
         bridge_balance_before = beth_token.balanceOf(beth_shuttle_vault)
 
         #liquidator upgrade
-
-        max_steth_eth_price_difference_percent = 0.4
-        max_eth_usdc_price_difference_percent = 0.4
-        max_usdc_ust_price_difference_percent = 0.4
-        max_steth_ust_price_difference_percent = 1.0
+        max_steth_eth_price_difference_percent = 0.3
+        max_eth_usdc_price_difference_percent = 0.5
+        max_usdc_ust_price_difference_percent = 0.5
+        max_steth_ust_price_difference_percent = 0.8
 
         rewards_liquidator = RewardsLiquidator.deploy(
             vault.address,
