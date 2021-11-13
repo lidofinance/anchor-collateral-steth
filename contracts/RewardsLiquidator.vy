@@ -185,7 +185,7 @@ def configure(
 
 @internal
 @view
-def _get_chainlink_price(chainlink_price_feed: address, reverse: bool = False) -> uint256:
+def _get_chainlink_price(chainlink_price_feed: address) -> uint256:
     price_decimals: uint256 = ChainlinkAggregatorV3Interface(chainlink_price_feed).decimals()
     assert 0 < price_decimals and price_decimals <= 18
 
@@ -199,9 +199,14 @@ def _get_chainlink_price(chainlink_price_feed: address, reverse: bool = False) -
         ChainlinkAggregatorV3Interface(chainlink_price_feed).latestRoundData()
 
     assert updated_at != 0
-    if reverse:
-        return  (10 ** (18 + price_decimals)) / convert(answer, uint256)
+    # forced conversion to 18 decimal places
     return convert(answer, uint256) * (10 ** (18 - price_decimals))
+
+
+@internal
+@view
+def _get_inverse_rate(price: uint256) -> uint256:
+    return  (10 ** 36) / price  
 
 
 @internal
@@ -259,7 +264,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert steth_amount > 0, "zero stETH balance"
 
     # steth -> eth
-    steth_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_STETH_ETH_FEED, False)
+    steth_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_STETH_ETH_FEED)
     min_eth_amount: uint256 = self._get_min_amount_out(
         steth_amount,
         steth_eth_price,
@@ -280,7 +285,8 @@ def liquidate(ust_recipient: address) -> uint256:
     assert self.balance >= eth_amount, "ETH balance mismatch"
 
     # eth -> usdc
-    eth_usdc_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED, True)
+    usdc_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED)
+    eth_usdc_price: uint256 = self._get_inverse_rate(usdc_eth_price)
     min_usdc_amount: uint256 = self._get_min_amount_out(
         eth_amount,
         eth_usdc_price,
@@ -299,8 +305,7 @@ def liquidate(ust_recipient: address) -> uint256:
     assert ERC20(USDC_TOKEN).balanceOf(self) >= usdc_amount, "USDC balance mismatch"
 
     # usdc -> ust
-    usdc_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED, False)
-    eth_ust_price: uint256 = self._get_chainlink_price(CHAINLINK_UST_ETH_FEED, True)
+    eth_ust_price: uint256 = self._get_inverse_rate(self._get_chainlink_price(CHAINLINK_UST_ETH_FEED))
     usdc_ust_price: uint256 = self._get_chainlink_cross_price(usdc_eth_price, eth_ust_price)
     min_ust_amount: uint256 = self._get_min_amount_out(
         usdc_amount,
