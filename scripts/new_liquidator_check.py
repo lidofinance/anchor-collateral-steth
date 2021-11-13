@@ -117,8 +117,8 @@ def main():
         #liquidator upgrade
         max_steth_eth_price_difference_percent = 0.3
         max_eth_usdc_price_difference_percent = 0.5
-        max_usdc_ust_price_difference_percent = 0.7
-        max_steth_ust_price_difference_percent = 1.0
+        max_usdc_ust_price_difference_percent = 0.5
+        max_steth_ust_price_difference_percent = 0.8
 
         rewards_liquidator = RewardsLiquidator.deploy(
             vault.address,

@@ -279,7 +279,7 @@ def liquidate(ust_recipient: address) -> uint256:
         CURVE_STETH_INDEX,
         CURVE_ETH_INDEX,
         steth_amount,
-        min_eth_amount
+        0 # do not require a minimum amount
     )
     assert eth_amount >= min_eth_amount, "insuff. ETH return"
     assert self.balance >= eth_amount, "ETH balance mismatch"
@@ -297,7 +297,7 @@ def liquidate(ust_recipient: address) -> uint256:
 
     usdc_amount: uint256 = self._uniswap_v3_sell_eth_to_usdc(
         eth_amount,
-        min_usdc_amount,
+        0, # do not require a minimum amount
         self
     )
 
@@ -321,7 +321,7 @@ def liquidate(ust_recipient: address) -> uint256:
         CURVE_USDC_INDEX,
         CURVE_UST_INDEX,
         usdc_amount,
-        min_ust_amount
+        0 # do not require a minimum amount
     )
 
     assert ust_amount >= min_ust_amount, "insuff. UST return"
