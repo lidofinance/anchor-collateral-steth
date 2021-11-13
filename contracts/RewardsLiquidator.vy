@@ -37,15 +37,8 @@ event PriceDifferenceChanged:
     max_usdc_ust_price_difference_percent: uint256
     max_steth_ust_price_difference_percent: uint256
 
-event PoolsChanged:
-    curve_steth_pool: address
-    curve_ust_pool: address
-    uniswap_router_v3: address
-    uniswap_usdc_pool_fee: uint256
-    curve_eth_index: int128
-    curve_steth_index: int128
-    curve_usdc_index: int128
-    curve_ust_index: int128
+event UniswapUSDCPoolFeeChanged:
+    fee: uint256
 
 
 UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
@@ -60,6 +53,15 @@ WETH_TOKEN_DECIMALS: constant(uint256) = 18
 CHAINLINK_STETH_ETH_FEED: constant(address) = 0x86392dC19c0b719886221c78AB11eb8Cf5c52812
 CHAINLINK_UST_ETH_FEED: constant(address) = 0xa20623070413d42a5C01Db2c8111640DD7A5A03a
 CHAINLINK_USDC_ETH_FEED: constant(address) = 0x986b5E1e1755e3C2440e960477f25201B0a8bbD4
+
+CURVE_STETH_POOL: constant(address) = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022
+CURVE_UST_POOL: constant(address) = 0x890f4e345B1dAED0367A877a1612f86A1f86985f
+UNISWAP_ROUTER_V3: constant(address) = 0xE592427A0AEce92De3Edee1F18E0157C05861564
+
+CURVE_ETH_INDEX: constant(uint256) = 0
+CURVE_STETH_INDEX: constant(uint256) = 1
+CURVE_USDC_INDEX: constant(uint256) = 2
+CURVE_UST_INDEX: constant(uint256) = 0
 
 # An address that is allowed to configure the liquidator settings.
 admin: public(address)
@@ -83,15 +85,8 @@ max_usdc_ust_price_difference_percent: public(uint256)
 # stETH/UST price and the stETH/USD anchor price obtained from the oracle.
 max_steth_ust_price_difference_percent: public(uint256)
 
-# Pools addresses, pools paramters, coin indeces inside pools
-curve_steth_pool: public(address)
-curve_ust_pool: public(address)
-uniswap_router_v3: public(address)
+# Uniswap pool fee (required for pool selection)
 uniswap_usdc_pool_fee: public(uint256)
-curve_eth_index: public(int128)
-curve_steth_index: public(int128)
-curve_usdc_index: public(int128)
-curve_ust_index: public(int128)
 
 
 @external
@@ -111,24 +106,10 @@ def __init__(
     self.admin = admin
     log AdminChanged(self.admin)
 
-    self.curve_steth_pool = 0xDC24316b9AE028F1497c275EB9192a3Ea0f67022
-    self.curve_ust_pool = 0x890f4e345B1dAED0367A877a1612f86A1f86985f
-    self.uniswap_router_v3 = 0xE592427A0AEce92De3Edee1F18E0157C05861564
-    self.uniswap_usdc_pool_fee = 3000 # using pool with fee 0.3%
-    self.curve_eth_index = 0
-    self.curve_steth_index = 1
-    self.curve_usdc_index = 2
-    self.curve_ust_index = 0
+    self.uniswap_usdc_pool_fee = 3000 # initially we use a pool with a commission of 0.3%
 
-    log PoolsChanged(
-        self.curve_steth_pool, 
-        self.curve_ust_pool,
-        self.uniswap_router_v3,
-        self.uniswap_usdc_pool_fee,
-        self.curve_eth_index,
-        self.curve_steth_index,
-        self.curve_usdc_index,
-        self.curve_ust_index
+    log UniswapUSDCPoolFeeChanged(
+        self.uniswap_usdc_pool_fee
     )
 
     assert max_steth_eth_price_difference_percent <= 10**18, "invalid percentage"
@@ -163,40 +144,16 @@ def change_admin(new_admin: address):
 
 
 @external
-def set_pools(
-    curve_steth_pool: address,
-    curve_ust_pool: address,
-    uniswap_router_v3: address,
-    uniswap_usdc_pool_fee: uint256,
-    curve_eth_index: int128,
-    curve_steth_index: int128,
-    curve_usdc_index: int128,
-    curve_ust_index: int128
+def set_uniswap_usdc_pool_fee(
+    fee: uint256
 ):
     assert msg.sender == self.admin
-    assert curve_steth_pool != ZERO_ADDRESS, "invalid curve_steth_pool"
-    assert curve_ust_pool != ZERO_ADDRESS, "invalid curve_ust_pool"
-    assert uniswap_router_v3 != ZERO_ADDRESS, "invalid uniswap_router_v3"
-    assert uniswap_usdc_pool_fee > 0, "invalid uniswap_usdc_pool_fee"
+    assert fee > 0, "invalid uniswap_usdc_pool_fee"
 
-    self.curve_steth_pool = curve_steth_pool
-    self.curve_ust_pool = curve_ust_pool
-    self.uniswap_router_v3 = uniswap_router_v3
-    self.uniswap_usdc_pool_fee = uniswap_usdc_pool_fee
-    self.curve_eth_index = curve_eth_index
-    self.curve_steth_index = curve_steth_index
-    self.curve_usdc_index = curve_usdc_index
-    self.curve_ust_index = curve_ust_index
+    self.uniswap_usdc_pool_fee = fee
 
-    log PoolsChanged(
-        self.curve_steth_pool, 
-        self.curve_ust_pool,
-        self.uniswap_router_v3,
+    log UniswapUSDCPoolFeeChanged(
         self.uniswap_usdc_pool_fee,
-        self.curve_eth_index,
-        self.curve_steth_index,
-        self.curve_usdc_index,
-        self.curve_ust_index
     )
 
 
@@ -261,7 +218,7 @@ def _uniswap_v3_sell_eth_to_usdc(
 ) -> uint256:
 
     result: Bytes[32] = raw_call(
-        self.uniswap_router_v3,
+        UNISWAP_ROUTER_V3,
         concat(
             method_id("exactInputSingle((address,address,uint24,address,uint256,uint256,uint256,uint160))"),
             convert(WETH_TOKEN, bytes32),
@@ -277,7 +234,6 @@ def _uniswap_v3_sell_eth_to_usdc(
         max_outsize=32
     )
     return convert(result, uint256)
-
 
 @internal
 @pure
@@ -312,11 +268,11 @@ def liquidate(ust_recipient: address) -> uint256:
         WETH_TOKEN_DECIMALS
     )
 
-    ERC20(STETH_TOKEN).approve(self.curve_steth_pool, steth_amount)
+    ERC20(STETH_TOKEN).approve(CURVE_STETH_POOL, steth_amount)
 
-    eth_amount: uint256 = CurvePool(self.curve_steth_pool).exchange(
-        self.curve_steth_index,
-        self.curve_eth_index,
+    eth_amount: uint256 = CurvePool(CURVE_STETH_POOL).exchange(
+        CURVE_STETH_INDEX,
+        CURVE_ETH_INDEX,
         steth_amount,
         min_eth_amount
     )
@@ -354,11 +310,11 @@ def liquidate(ust_recipient: address) -> uint256:
         UST_TOKEN_DECIMALS
     )
 
-    ERC20(USDC_TOKEN).approve(self.curve_ust_pool, usdc_amount)
+    ERC20(USDC_TOKEN).approve(CURVE_UST_POOL, usdc_amount)
 
-    ust_amount: uint256 = CurveMetaPool(self.curve_ust_pool).exchange_underlying(
-        self.curve_usdc_index,
-        self.curve_ust_index,
+    ust_amount: uint256 = CurveMetaPool(CURVE_UST_POOL).exchange_underlying(
+        CURVE_USDC_INDEX,
+        CURVE_UST_INDEX,
         usdc_amount,
         min_ust_amount
     )
