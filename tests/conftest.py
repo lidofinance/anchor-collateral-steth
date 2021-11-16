@@ -3,7 +3,9 @@ from brownie import ZERO_ADDRESS
 
 
 BETH_DECIMALS = 18
-UST_TOKEN = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
+UST_TOKEN = "0xa47c8bf37f92aBed4A126BDA807A7b7498661acD"
+STETH_TOKEN = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
+USDC_TOKEN = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -56,7 +58,7 @@ def another_stranger(accounts, deployer):
 
 @pytest.fixture(scope='module')
 def steth_token(interface):
-    return interface.ERC20('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
+    return interface.ERC20(STETH_TOKEN)
 
 
 @pytest.fixture(scope='module')
@@ -66,7 +68,12 @@ def lido(interface, steth_token):
 
 @pytest.fixture(scope='module')
 def ust_token(interface):
-    return interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
+    return interface.UST(UST_TOKEN)
+
+
+@pytest.fixture(scope='module')
+def usdc_token(interface):
+    return interface.USDC(USDC_TOKEN)
 
 
 @pytest.fixture(scope='module')
