@@ -277,14 +277,15 @@ def liquidate(ust_recipient: address) -> uint256:
 
     ERC20(STETH_TOKEN).approve(CURVE_STETH_POOL, steth_amount)
 
-    eth_amount: uint256 = CurvePool(CURVE_STETH_POOL).exchange(
+    CurvePool(CURVE_STETH_POOL).exchange(
         CURVE_STETH_INDEX,
         CURVE_ETH_INDEX,
         steth_amount,
         0 # do not require a minimum amount
     )
+    eth_amount: uint256 = self.balance
+
     assert eth_amount >= min_eth_amount, "insuff. ETH return"
-    assert self.balance >= eth_amount, "ETH balance mismatch"
 
     # eth -> usdc
     usdc_eth_price: uint256 = self._get_chainlink_price(CHAINLINK_USDC_ETH_FEED)
@@ -297,14 +298,14 @@ def liquidate(ust_recipient: address) -> uint256:
         USDC_TOKEN_DECIMALS
     )
 
-    usdc_amount: uint256 = self._uniswap_v3_sell_eth_to_usdc(
+    self._uniswap_v3_sell_eth_to_usdc(
         eth_amount,
         0, # do not require a minimum amount
         self
     )
+    usdc_amount: uint256 = ERC20(USDC_TOKEN).balanceOf(self)
 
     assert usdc_amount >= min_usdc_amount, "insuff. USDC return"
-    assert ERC20(USDC_TOKEN).balanceOf(self) >= usdc_amount, "USDC balance mismatch"
 
     # usdc -> ust
     eth_ust_price: uint256 = self._get_inverse_rate(self._get_chainlink_price(CHAINLINK_UST_ETH_FEED))
@@ -319,15 +320,15 @@ def liquidate(ust_recipient: address) -> uint256:
 
     ERC20(USDC_TOKEN).approve(CURVE_UST_POOL, usdc_amount)
 
-    ust_amount: uint256 = CurveMetaPool(CURVE_UST_POOL).exchange_underlying(
+    CurveMetaPool(CURVE_UST_POOL).exchange_underlying(
         CURVE_USDC_INDEX,
         CURVE_UST_INDEX,
         usdc_amount,
         0 # do not require a minimum amount
     )
+    ust_amount: uint256 = ERC20(UST_TOKEN).balanceOf(self)
 
     assert ust_amount >= min_ust_amount, "insuff. UST return"
-    assert ERC20(UST_TOKEN).balanceOf(self) >= ust_amount, "UST balance mismatch"
 
     # final overall check
     steth_ust_price: uint256 = self._get_chainlink_cross_price(steth_eth_price, eth_ust_price)
@@ -339,8 +340,7 @@ def liquidate(ust_recipient: address) -> uint256:
         UST_TOKEN_DECIMALS
     )
 
-    assert ust_amount >= min_ust_amount, "insuff. overall UST"
-    assert ERC20(UST_TOKEN).balanceOf(self) >= ust_amount, "UST balance mismatch"
+    assert ust_amount >= min_ust_amount, "insuff. overall UST return"
 
     ERC20(UST_TOKEN).transfer(ust_recipient, ust_amount)
 
