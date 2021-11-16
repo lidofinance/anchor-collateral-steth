@@ -70,19 +70,19 @@ admin: public(address)
 vault: public(address)
 
 # Maximum difference (in percents multiplied by 10**18) between the resulting
-# stETH/ETH price and the stETH/ETH anchor price obtained from the oracle.
+# stETH/ETH price and the stETH/ETH anchor price obtained from the feed.
 max_steth_eth_price_difference_percent: public(uint256)
 
 # Maximum difference (in percents multiplied by 10**18) between the resulting
-# ETH/USDC price and the ETH/USDC anchor price obtained from the oracle.
+# ETH/USDC price and the ETH/USDC anchor price obtained from the feed.
 max_eth_usdc_price_difference_percent: public(uint256)
 
 # Maximum difference (in percents multiplied by 10**18) between the resulting
-# USDC/UST price and the USDC/USD anchor price obtained from the oracle.
+# USDC/UST price and the USDC/USD anchor price obtained from the feed.
 max_usdc_ust_price_difference_percent: public(uint256)
 
 # Maximum difference (in percents multiplied by 10**18) between the resulting
-# stETH/UST price and the stETH/USD anchor price obtained from the oracle.
+# stETH/UST price and the stETH/USD anchor price obtained from the feed.
 max_steth_ust_price_difference_percent: public(uint256)
 
 # Uniswap pool fee (required for pool selection)
@@ -108,9 +108,7 @@ def __init__(
 
     self.uniswap_usdc_pool_fee = 3000 # initially we use a pool with a commission of 0.3%
 
-    log UniswapUSDCPoolFeeChanged(
-        self.uniswap_usdc_pool_fee
-    )
+    log UniswapUSDCPoolFeeChanged(self.uniswap_usdc_pool_fee)
 
     assert max_steth_eth_price_difference_percent <= 10**18, "invalid percentage"
     assert max_eth_usdc_price_difference_percent <= 10**18, "invalid percentage"
@@ -138,7 +136,7 @@ def __default__():
 
 @external
 def change_admin(new_admin: address):
-    assert msg.sender == self.admin
+    assert msg.sender == self.admin, "unauthorized"
     self.admin = new_admin
     log AdminChanged(self.admin)
 
@@ -147,14 +145,12 @@ def change_admin(new_admin: address):
 def set_uniswap_usdc_pool_fee(
     fee: uint256
 ):
-    assert msg.sender == self.admin
+    assert msg.sender == self.admin, "unauthorized"
     assert fee > 0, "invalid uniswap_usdc_pool_fee"
 
     self.uniswap_usdc_pool_fee = fee
 
-    log UniswapUSDCPoolFeeChanged(
-        self.uniswap_usdc_pool_fee,
-    )
+    log UniswapUSDCPoolFeeChanged(self.uniswap_usdc_pool_fee)
 
 
 @external
@@ -164,7 +160,7 @@ def configure(
     max_usdc_ust_price_difference_percent: uint256,
     max_steth_ust_price_difference_percent: uint256
 ):
-    assert msg.sender == self.admin
+    assert msg.sender == self.admin, "unauthorized"
     assert max_steth_eth_price_difference_percent <= 10**18, "invalid percentage"
     assert max_eth_usdc_price_difference_percent <= 10**18, "invalid percentage"
     assert max_usdc_ust_price_difference_percent <= 10**18, "invalid percentage"
@@ -240,6 +236,7 @@ def _uniswap_v3_sell_eth_to_usdc(
     )
     return convert(result, uint256)
 
+
 @internal
 @pure
 def _get_min_amount_out(
@@ -249,9 +246,14 @@ def _get_min_amount_out(
     decimal_token_in: uint256,
     decimal_token_out: uint256
 ) -> uint256:
-    amount_out: uint256 = (amount * price) / (10 ** decimal_token_in) # = (amount * (10 ** (18 - decimal_token_in)) * price) / 10 ** 18
+    # = (amount * (10 ** (18 - decimal_token_in)) * price) / 10 ** 18
+    amount_out: uint256 = (amount * price) / (10 ** decimal_token_in)
+
     min_mult: uint256 = 10**18 - max_diff_percent
-    return (amount_out * min_mult) / (10 ** (36 - decimal_token_out)) # = ((amount_out * min_mult) / 10**18) / (10 ** (18 - decimal_token_out))
+
+    # = ((amount_out * min_mult) / 10**18) / (10 ** (18 - decimal_token_out))
+    return (amount_out * min_mult) / (10 ** (36 - decimal_token_out))
+
 
 # 1) stETH -> ETH (Curve)
 # 2) ETH -> USDC (Uniswap v3)
