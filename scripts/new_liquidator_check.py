@@ -1,3 +1,4 @@
+import os
 from brownie import interface, accounts, network, Contract, ZERO_ADDRESS
 from brownie import (
     bEth,
@@ -27,10 +28,16 @@ def main():
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
 
     bridge_connector = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
-    rewards_liquidator = RewardsLiquidator.at('0xdb99Fdb42FEc8Ba414ea60b3a189208bBdbfa321')
+    old_rewards_liquidator = RewardsLiquidator.at('0xdb99Fdb42FEc8Ba414ea60b3a189208bBdbfa321')
     insurance_connector = InsuranceConnector.at('0x2BDfD3De0fF23373B621CDAD0aD3dF1580efE701')
 
     terra_rewards_distributor = '0x2c4ab12675bccba793170e21285f8793611135df000000000000000000000000'
+
+    new_liquidator_address = os.getenv('LIQUIDATOR_ASSRESS', default=None)
+    new_liquidator_deployed = new_liquidator_address is not None
+    if new_liquidator_deployed:
+        new_rewards_liquidator = RewardsLiquidator.at(new_liquidator_address)
+    new_liquidator_configured = new_liquidator_deployed and vault.rewards_liquidator() == new_rewards_liquidator.address
 
     print('loading liquidations admin account...')
     liquidations_admin = accounts.load('anchor-mainnet-liquidator')
@@ -78,7 +85,10 @@ def main():
     assert_equals('  beth_token', vault.beth_token(), beth_token.address)
     assert_equals('  steth_token', vault.steth_token(), steth_token.address)
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector.address)
-    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), rewards_liquidator.address)
+    if new_liquidator_configured:
+        log.nb('  rewards_liquidator', 'skipped')
+    else:
+        assert_equals('  rewards_liquidator', vault.rewards_liquidator(), old_rewards_liquidator.address)
     assert_equals('  insurance_connector', vault.insurance_connector(), insurance_connector.address)
 
     print()
@@ -117,63 +127,58 @@ def main():
         #liquidator upgrade
         max_steth_eth_price_difference_percent = 0.3
         max_eth_usdc_price_difference_percent = 0.5
-        max_usdc_ust_price_difference_percent = 0.5
-        max_steth_ust_price_difference_percent = 0.8
+        max_usdc_ust_price_difference_percent = 0.7
+        max_steth_ust_price_difference_percent = 1.0
 
-        rewards_liquidator = RewardsLiquidator.deploy(
-            vault.address,
-            dev_multisig,
-            int(max_steth_eth_price_difference_percent * 10**18 / 100),
-            int(max_eth_usdc_price_difference_percent * 10**18 / 100),
-            int(max_usdc_ust_price_difference_percent * 10**18 / 100),
-            int(max_steth_ust_price_difference_percent * 10**18 / 100),
-            {'from': lido_deployer_acct }
-        )
+        if not new_liquidator_deployed:
+            log.nb('Deploying new RewardsLiquidator')
+            new_rewards_liquidator = RewardsLiquidator.deploy(
+                vault.address,
+                dev_multisig,
+                int(max_steth_eth_price_difference_percent * 10**18 / 100),
+                int(max_eth_usdc_price_difference_percent * 10**18 / 100),
+                int(max_usdc_ust_price_difference_percent * 10**18 / 100),
+                int(max_steth_ust_price_difference_percent * 10**18 / 100),
+                {'from': lido_deployer_acct}
+            )
 
-        log.ok('RewardsLiquidator (new)', rewards_liquidator.address)
-        assert_equals('  admin', rewards_liquidator.admin(), dev_multisig)
-        assert_equals('  vault', rewards_liquidator.vault(), vault_proxy.address)
+        log.ok('RewardsLiquidator (new)', new_rewards_liquidator.address)
+        assert_equals('  admin', new_rewards_liquidator.admin(), dev_multisig)
+        assert_equals('  vault', new_rewards_liquidator.vault(), vault_proxy.address)
         assert_equals('  max_steth_eth_price_difference_percent',
-            rewards_liquidator.max_steth_eth_price_difference_percent(),
+            new_rewards_liquidator.max_steth_eth_price_difference_percent(),
             int(max_steth_eth_price_difference_percent * 10**18 / 100)
         )
         assert_equals('  max_eth_usdc_price_difference_percent',
-            rewards_liquidator.max_eth_usdc_price_difference_percent(),
+            new_rewards_liquidator.max_eth_usdc_price_difference_percent(),
             int(max_eth_usdc_price_difference_percent * 10**18 / 100)
         )
         assert_equals('  max_usdc_ust_price_difference_percent',
-            rewards_liquidator.max_usdc_ust_price_difference_percent(),
+            new_rewards_liquidator.max_usdc_ust_price_difference_percent(),
             int(max_usdc_ust_price_difference_percent * 10**18 / 100)
         )
         assert_equals('  max_steth_ust_price_difference_percent',
-            rewards_liquidator.max_steth_ust_price_difference_percent(),
+            new_rewards_liquidator.max_steth_ust_price_difference_percent(),
             int(max_steth_ust_price_difference_percent * 10**18 / 100)
         )
 
-        tx_data = vault.configure.encode_input(
-            bridge_connector,
-            rewards_liquidator,
-            insurance_connector,
-            liquidations_admin,
-            no_liquidation_interval,
-            restricted_liquidation_interval,
-            terra_rewards_distributor
-        )
 
-        log.ok('multisig tx recipient', vault_proxy.address)
-        log.ok('multisig tx data', tx_data)
+        if not new_liquidator_configured:
+            log.nb('Updating address at Vault')
+            tx_data = vault.set_rewards_liquidator.encode_input(new_rewards_liquidator)
+            log.ok('multisig tx recipient', vault_proxy.address)
+            log.ok('multisig tx data', tx_data)
+            print()
 
-        print()
-
-        tx = dev_multisig_acct.transfer(to=vault.address, data=tx_data)
-        tx.info()
+            tx = dev_multisig_acct.transfer(to=vault.address, data=tx_data)
+            tx.info()
 
         log.ok('AnchorVault')
         assert_equals('  admin', vault.admin(), dev_multisig)
         assert_equals('  beth_token', vault.beth_token(), beth_token.address)
         assert_equals('  steth_token', vault.steth_token(), steth_token.address)
         assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector.address)
-        assert_equals('  rewards_liquidator', vault.rewards_liquidator(), rewards_liquidator.address)
+        assert_equals('  rewards_liquidator', vault.rewards_liquidator(), new_rewards_liquidator.address)
         assert_equals('  insurance_connector', vault.insurance_connector(), insurance_connector.address)
         assert_equals('  liquidations_admin', vault.liquidations_admin(), liquidations_admin.address)
         assert_equals('  no_liquidation_interval', vault.no_liquidation_interval(), no_liquidation_interval)
@@ -182,7 +187,7 @@ def main():
         assert_equals('  get_rate', vault.get_rate(), 10**18)
 
         print()
-        print('Selling rewards...')
+        log.nb('Selling rewards...')
 
         tx = vault.collect_rewards({'from': liquidations_admin})
         tx.info()
@@ -190,7 +195,7 @@ def main():
         assert_equals('  can_deposit_or_withdraw', vault.can_deposit_or_withdraw(), True)
 
         print()
-        print('Submitting stETH...')
+        log.nb('Submitting stETH...')
 
         assert beth_token.totalSupply() == beth_supply_before
 
@@ -214,7 +219,7 @@ def main():
         log.ok('bridge bETH balance', bridge_balance / 10**18)
 
         print()
-        print('Submitting ETH...')
+        log.nb('Submitting ETH...')
 
         holder_2 = accounts[1]
 
