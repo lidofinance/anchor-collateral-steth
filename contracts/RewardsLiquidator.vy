@@ -60,8 +60,8 @@ UNISWAP_ROUTER_V3: constant(address) = 0xE592427A0AEce92De3Edee1F18E0157C0586156
 
 CURVE_ETH_INDEX: constant(uint256) = 0
 CURVE_STETH_INDEX: constant(uint256) = 1
-CURVE_USDC_INDEX: constant(uint256) = 2
-CURVE_UST_INDEX: constant(uint256) = 0
+CURVE_USDC_UNDERLYING_INDEX: constant(uint256) = 2
+CURVE_UST_UNDERLYING_INDEX: constant(uint256) = 0
 
 # An address that is allowed to configure the liquidator settings.
 admin: public(address)
@@ -321,8 +321,8 @@ def liquidate(ust_recipient: address) -> uint256:
     ERC20(USDC_TOKEN).approve(CURVE_UST_POOL, usdc_amount)
 
     CurveMetaPool(CURVE_UST_POOL).exchange_underlying(
-        CURVE_USDC_INDEX,
-        CURVE_UST_INDEX,
+        CURVE_USDC_UNDERLYING_INDEX,
+        CURVE_UST_UNDERLYING_INDEX,
         usdc_amount,
         0 # do not require a minimum amount
     )
