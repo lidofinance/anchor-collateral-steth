@@ -114,11 +114,11 @@ last_liquidation_shares_burnt: public(uint256)
 
 @external
 def initialize(beth_token: address, steth_token: address, admin: address):
-    assert self.beth_token == ZERO_ADDRESS # dev: already initialized
-    assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
-    assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
+    assert self.beth_token == ZERO_ADDRESS, "dev: already initialized"
+    assert beth_token != ZERO_ADDRESS, "dev: invalid bETH address"
+    assert steth_token != ZERO_ADDRESS, "dev: invalid stETH address"
 
-    assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
+    assert ERC20(beth_token).totalSupply() == 0, "dev: non-zero bETH total supply"
 
     self.beth_token = beth_token
     self.steth_token = steth_token
@@ -136,7 +136,7 @@ def change_admin(new_admin: address):
 
     Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self.admin = new_admin
     log AdminChanged(new_admin)
 
@@ -155,13 +155,13 @@ def set_bridge_connector(_bridge_connector: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_bridge_connector(_bridge_connector)
 
 
 @internal
 def _set_rewards_liquidator(_rewards_liquidator: address):
-    self.rewards_liquidator = _rewards_liquidator # dev: unauthorized
+    self.rewards_liquidator = _rewards_liquidator
     log RewardsLiquidatorUpdated(_rewards_liquidator)
 
 
@@ -172,7 +172,7 @@ def set_rewards_liquidator(_rewards_liquidator: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_rewards_liquidator(_rewards_liquidator)
 
 
@@ -190,7 +190,7 @@ def set_insurance_connector(_insurance_connector: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_insurance_connector(_insurance_connector)
 
 
@@ -226,7 +226,7 @@ def set_liquidation_config(
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_liquidation_config(
         _liquidations_admin,
         _no_liquidation_interval,
@@ -248,7 +248,7 @@ def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
 
@@ -267,7 +267,7 @@ def configure(
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin, "dev: unauthorized"
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
     self._set_insurance_connector(_insurance_connector)
@@ -357,13 +357,13 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) 
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
-    assert self._can_deposit_or_withdraw() # dev: share price changed
+    assert self._can_deposit_or_withdraw(), "dev: share price changed"
 
     steth_token: address = self.steth_token
     steth_amount: uint256 = _amount
 
     if msg.value != 0:
-        assert msg.value == _amount # dev: unexpected ETH amount sent
+        assert msg.value == _amount, "dev: unexpected ETH amount sent"
         shares_minted: uint256 = Lido(steth_token).submit(self, value=_amount)
         steth_amount = Lido(steth_token).getPooledEthByShares(shares_minted)
 
@@ -375,7 +375,7 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) 
     beth_amount = BridgeConnector(connector).adjust_amount(beth_amount, BETH_DECIMALS)
 
     steth_amount_adj: uint256 = (beth_amount * 10**18) / beth_rate
-    assert steth_amount_adj <= steth_amount # dev: invalid adjusted amount
+    assert steth_amount_adj <= steth_amount, "dev: invalid adjusted amount"
 
     if msg.value == 0:
         ERC20(steth_token).transferFrom(msg.sender, self, steth_amount_adj)
@@ -405,7 +405,7 @@ def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
-    assert self._can_deposit_or_withdraw() # dev: share price changed
+    assert self._can_deposit_or_withdraw(), "dev: share price changed"
 
     steth_rate: uint256 = self._get_rate(True)
     steth_amount: uint256 = (_amount * steth_rate) / 10**18
@@ -427,9 +427,9 @@ def collect_rewards() -> uint256:
     time_since_last_liquidation: uint256 = block.timestamp - self.last_liquidation_time
 
     if msg.sender == self.liquidations_admin:
-        assert time_since_last_liquidation > self.no_liquidation_interval # dev: too early to sell
+        assert time_since_last_liquidation > self.no_liquidation_interval, "dev: too early to sell"
     else:
-        assert time_since_last_liquidation > self.restricted_liquidation_interval # dev: too early to sell
+        assert time_since_last_liquidation > self.restricted_liquidation_interval, "dev: too early to sell"
 
     # The code below sells all rewards accrued by stETH held in the vault to UST
     # and forwards the outcome to the rewards distributor contract in Terra.
