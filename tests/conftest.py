@@ -6,6 +6,9 @@ BETH_DECIMALS = 18
 UST_TOKEN = "0xa47c8bf37f92aBed4A126BDA807A7b7498661acD"
 STETH_TOKEN = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84"
 USDC_TOKEN = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+CHAINLINK_STETH_ETH_FEED = "0x86392dC19c0b719886221c78AB11eb8Cf5c52812"
+CHAINLINK_UST_ETH_FEED = "0xa20623070413d42a5C01Db2c8111640DD7A5A03a"
+CHAINLINK_USDC_ETH_FEED = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
 
 
 @pytest.fixture(scope='function', autouse=True)
@@ -75,6 +78,17 @@ def ust_token(interface):
 def usdc_token(interface):
     return interface.USDC(USDC_TOKEN)
 
+@pytest.fixture(scope='module')
+def feed_steth_eth(interface):
+    return interface.Chainlink(CHAINLINK_STETH_ETH_FEED)
+
+@pytest.fixture(scope='module')
+def feed_usdc_eth(interface):
+    return interface.Chainlink(CHAINLINK_USDC_ETH_FEED)
+
+@pytest.fixture(scope='module')
+def feed_ust_eth(interface):
+    return interface.Chainlink(CHAINLINK_UST_ETH_FEED)
 
 @pytest.fixture(scope='module')
 def beth_token(deployer, admin, bEth):
@@ -214,6 +228,18 @@ class Helpers:
         if max_diff is None:
             max_diff = (max_diff_percent / 100) * expected
         return abs(actual - expected) <= max_diff
+
+    @staticmethod
+    def get_price(feed, inverse = False):
+        decimals = feed.decimals()
+        answer = feed.latestAnswer()
+        if inverse:
+            return  (10 ** decimals) / answer
+        return answer / (10 ** decimals)
+
+    @staticmethod
+    def get_cross_price(priceA, priceB):
+        return (priceA * priceB)
 
 
 
