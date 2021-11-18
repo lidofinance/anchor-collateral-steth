@@ -6,10 +6,10 @@ from brownie.network.event import _decode_logs
 from test_vault import vault, ANCHOR_REWARDS_DISTRIBUTOR
 
 
-MAX_STETH_ETH_PRICE_DIFF_PERCENT = 1.11
-MAX_ETH_USDC_PRICE_DIFF_PERCENT = 1.22
-MAX_USDC_UST_PRICE_DIFF_PERCENT = 0.55
-MAX_STETH_UST_PRICE_DIFF_PERCENT = 2.33
+MAX_STETH_ETH_PRICE_DIFF_PERCENT = 1.5
+MAX_ETH_USDC_PRICE_DIFF_PERCENT = 3
+MAX_USDC_UST_PRICE_DIFF_PERCENT = 3
+MAX_STETH_UST_PRICE_DIFF_PERCENT = 5
 
 CURVE_STETH_POOL = "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022"
 CURVE_UST_POOL = "0x890f4e345B1dAED0367A877a1612f86A1f86985f"
@@ -216,17 +216,19 @@ def test_configure(liquidator, admin, stranger, helpers):
     helpers.assert_single_event_named("AdminChanged", tx, source=liquidator, evt_keys_dict={"new_admin": stranger})
 
 
-def test_fails_on_excess_steth_eth_price_change(interface, whale, steth_token, vault_user, mock_vault, ust_recipient, liquidator):
+def test_fails_on_excess_steth_eth_price_change(interface, whale, steth_token, vault_user, mock_vault, ust_recipient, liquidator, feed_steth_eth, helpers):
     steth_pool = interface.CurveSTETH(CURVE_STETH_POOL)
 
-    old_steth_price = steth_pool.get_dy(CURVE_STETH_INDEX, CURVE_ETH_INDEX, 10 ** 18)
+    feed_price = helpers.get_price(feed_steth_eth, False)
+    print("chainlink steth->eth price", feed_price)
 
     liquidity_amount = 3_000_000 * 10 ** 18
     steth_token.approve(steth_pool, liquidity_amount, {"from": whale})
     steth_pool.add_liquidity([0, liquidity_amount], 0, {"from": whale})
 
-    new_steth_price = steth_pool.get_dy(CURVE_STETH_INDEX, CURVE_ETH_INDEX, 10 ** 18)
-    assert old_steth_price * ((100 - MAX_STETH_ETH_PRICE_DIFF_PERCENT) / 100) >= new_steth_price
+    pool_price = steth_pool.get_dy(CURVE_STETH_INDEX, CURVE_ETH_INDEX, 10 ** 18) / 10 ** 18
+    print("pool steth->eth price", pool_price)
+    assert feed_price * ((100 - MAX_STETH_ETH_PRICE_DIFF_PERCENT) / 100) >= pool_price
 
     steth_amount = 10 ** 18
     steth_token.transfer(liquidator, steth_amount, {"from": vault_user})
@@ -234,23 +236,21 @@ def test_fails_on_excess_steth_eth_price_change(interface, whale, steth_token, v
     with reverts():
         liquidator.liquidate(ust_recipient, {"from": mock_vault})
 
-
 def test_fails_on_excess_usdc_ust_price_change(
-    interface, whale, ust_token, usdc_token, steth_token, vault_user, mock_vault, ust_recipient, liquidator
+    interface, whale, usdc_token, steth_token, vault_user, mock_vault, ust_recipient, liquidator, feed_usdc_eth, feed_ust_eth, helpers
 ):
     ust_pool = interface.CurveUST(CURVE_UST_POOL)
 
-    old_ust_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6)
-    print("old_ust_price", old_ust_price)
-
-    liquidity_amount = 15_000_000 * 10 ** 6
+    feed_price = helpers.get_cross_price(helpers.get_price(feed_usdc_eth, False), helpers.get_price(feed_ust_eth, True))
+    print("chainlink usdc->eth->ust price", feed_price)
+    liquidity_amount = 45_000_000 * 10 ** 6
     usdc_pool = interface.CurveUSDC(CURVE_USDC_POOL)
     usdc_token.approve(usdc_pool, liquidity_amount, {"from": whale})
     usdc_pool.add_liquidity([0, 0, liquidity_amount, 0], 0, {"from": whale})
 
-    new_ust_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6)
-    print("new_ust_price", new_ust_price)
-    assert old_ust_price * ((100 - MAX_USDC_UST_PRICE_DIFF_PERCENT) / 100) >= new_ust_price
+    pool_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6) / 10 ** 18
+    print("pool usdc->ust price", pool_price)
+    assert feed_price * ((100 - MAX_USDC_UST_PRICE_DIFF_PERCENT) / 100) >= pool_price
 
     steth_amount = 10 ** 18
     steth_token.transfer(liquidator, steth_amount, {"from": vault_user})
@@ -259,15 +259,15 @@ def test_fails_on_excess_usdc_ust_price_change(
         liquidator.liquidate(ust_recipient, {"from": mock_vault})
 
 
-def test_fails_on_excess_eth_usdc_price_change(interface, whale, steth_token, vault_user, ust_recipient, liquidator, mock_vault):
+def test_fails_on_excess_eth_usdc_price_change(interface, whale, steth_token, vault_user, ust_recipient, liquidator, mock_vault, feed_usdc_eth, helpers):
     router = interface.UniswapV3Router(UNISWAP_ROUTER_V3)
     factory = interface.UniswapV3Factory(router.factory())
     pool = interface.UniswapV3Pool(factory.getPool(USDC_TOKEN, WETH_TOKEN, UNISWAP_USDC_POOL_3_FEE))
-    sqrtPriceX96 = pool.slot0()[0]
-    old_eth_price = (10 ** WETH_DECIMALS) / (10 ** USDC_DECIMALS) * (2 ** 192 / sqrtPriceX96 ** 2)
 
+    feed_price = helpers.get_price(feed_usdc_eth, True)
+    print("chainlink eth->usdc price", feed_price)
     deadline = chain.time() + 3600
-    liquidity_amount = 3_000 * 10 ** 18
+    liquidity_amount = 10_000 * 10 ** 18
     router.exactInputSingle(
         (
             WETH_TOKEN,
@@ -282,8 +282,9 @@ def test_fails_on_excess_eth_usdc_price_change(interface, whale, steth_token, va
         {"from": whale, "amount": liquidity_amount},
     )
     sqrtPriceX96 = pool.slot0()[0]
-    new_eth_price = (10 ** WETH_DECIMALS) / (10 ** USDC_DECIMALS) * (2 ** 192 / sqrtPriceX96 ** 2)
-    assert old_eth_price * (100 - MAX_ETH_USDC_PRICE_DIFF_PERCENT) / 100 >= new_eth_price
+    pool_price = (10 ** WETH_DECIMALS) / (10 ** USDC_DECIMALS) * (2 ** 192 / sqrtPriceX96 ** 2)
+    print("pool eth->usdc price", pool_price)
+    assert feed_price * (100 - MAX_ETH_USDC_PRICE_DIFF_PERCENT) / 100 >= pool_price
 
     steth_amount = 10 ** 18
     steth_token.transfer(liquidator, steth_amount, {"from": vault_user})
