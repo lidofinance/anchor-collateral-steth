@@ -106,7 +106,16 @@ def main():
         assert beth_token.totalSupply() == beth_supply + 2 * 10**18
 
         assert 'LogMessagePublished' in tx.events
-        assert str(tx.events['LogMessagePublished']['payload']).endswith('000000000000000000000000707f9118e33a9b8998bea41dd0d46f38bb963fc80002abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd00030000000000000000000000000000000000000000000000000000000000000000')
+        
+        reference_payload = "0x01" # payloadId
+        reference_payload += "000000000000000000000000000000000000000000000000000000000bebc200" # amount 
+        reference_payload += "000000000000000000000000707f9118e33a9b8998bea41dd0d46f38bb963fc8" # tokenAddress
+        reference_payload += "0002" # tokenChain
+        reference_payload += "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" # to
+        reference_payload += "0003" # toChain
+        reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
+        
+        assert str(tx.events['LogMessagePublished']['payload']) == reference_payload
 
         log.ok('bridge bETH balance', bridge_balance / 10**18)
 
@@ -125,4 +134,12 @@ def main():
         tx.info()
 
         assert 'LogMessagePublished' in tx.events
-        assert str(tx.events['LogMessagePublished']['payload']).endswith('000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd00022c4ab12675bccba793170e21285f8793611135df00000000000000000000000000030000000000000000000000000000000000000000000000000000000000000000')
+        # reference_payload = "0x01" # payloadId
+        # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
+        reference_payload = "000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd" # tokenAddress
+        reference_payload += "0002" # tokenChain
+        reference_payload += "2c4ab12675bccba793170e21285f8793611135df000000000000000000000000" # to
+        reference_payload += "0003" # toChain
+        reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
+        
+        assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
