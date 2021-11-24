@@ -36,7 +36,7 @@ def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipi
     if len(_extra_data) >= 32:
         nonce = extract32(_extra_data, 0, output_type=uint256)
 
-        assert nonce <= 4294967295, "nonce exceeds size of uint32 (4 bytes)"
+        assert nonce <= MAX_UINT32, "nonce exceeds size of uint32 (4 bytes)"
 
     if len(_extra_data) >= 64:
         arbiter_fee = extract32(_extra_data, 32, output_type=uint256)
