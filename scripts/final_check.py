@@ -1,4 +1,4 @@
-from brownie import interface, accounts, network, Contract, ZERO_ADDRESS
+from brownie import interface, accounts, Contract, ZERO_ADDRESS
 from brownie import (
     bEth,
     AnchorVault,
@@ -9,6 +9,8 @@ from brownie import (
 )
 
 import utils.log as log
+
+from utils.config import get_is_live
 from utils.mainnet_fork import chain_snapshot
 
 
@@ -136,7 +138,7 @@ def main():
 
     print()
 
-    if network.show_active() != 'development':
+    if get_is_live():
         print('Running on a live network, cannot run further checks.')
         print('Run on a mainnet fork to do this.')
         return
