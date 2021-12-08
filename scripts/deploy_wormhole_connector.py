@@ -1,6 +1,7 @@
 import sys
 
-from brownie import Contract, AnchorVault, BridgeConnectorWormhole, Wei
+from brownie import interface, Contract, AnchorVault, Wei
+from brownie import BridgeConnectorWormhole, BridgeConnectorWormholeRopsten
 
 from utils.config import (
     gas_price,
@@ -8,15 +9,18 @@ from utils.config import (
     get_env, get_is_live,
     prompt_bool,
     token_bridge_wormhole_address,
+    token_bridge_wormhole_ropsten_address,
     vault_proxy_address,
+    vault_ropsten_address
 )
 
 def deploy_wormhole_bridge_connector(
+    contract,
     token_bridge_wormhole,
     tx_params,
     publish_source=False,
 ):
-    connector = BridgeConnectorWormhole.deploy(
+    connector = contract.deploy(
         token_bridge_wormhole,
         tx_params,
         publish_source=publish_source,
@@ -38,17 +42,26 @@ def main():
     is_live = get_is_live()
     deployer = get_deployer_account(is_live)
     changer = get_env('CHANGER')
+    network = get_env('NETWORK', is_required=False, default="mainnet")
 
     if not is_live:
         deployer.transfer(changer, Wei("2 ether"))
 
-    vault = Contract.from_abi('AnchorVault', vault_proxy_address, AnchorVault.abi)
+    if network == "ropsten":
+        connector_contract = BridgeConnectorWormholeRopsten
+        vault = interface.AnchorVaultRopsten(vault_ropsten_address)
+        bridge_address = token_bridge_wormhole_ropsten_address
+    else:
+        connector_contract = BridgeConnectorWormhole
+        vault = Contract.from_abi('AnchorVault', vault_proxy_address, AnchorVault.abi)
+        bridge_address = token_bridge_wormhole_address
+    
 
     print('Deployer:', deployer)
     print('Bridge connector changer:', changer)
     print('AnchorVault:', vault.address)
     print('AnchorVault bridge connector:', vault.bridge_connector())
-    print('Wormhole Token Bridge:', token_bridge_wormhole_address)
+    print('Wormhole Token Bridge:', bridge_address)
     print('Gas price:', gas_price)
 
     sys.stdout.write('Proceed? [y/n]: ')
@@ -58,7 +71,8 @@ def main():
         return
 
     connector = deploy_wormhole_bridge_connector(
-        token_bridge_wormhole_address,
+        connector_contract,
+        bridge_address,
         tx_params={'from': deployer, 'gas_price': Wei(gas_price), 'required_confs': 1},
         publish_source=is_live
     )

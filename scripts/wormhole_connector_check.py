@@ -4,6 +4,7 @@ from brownie import (
     AnchorVault,
     AnchorVaultProxy,
     BridgeConnectorShuttle,
+    BridgeConnectorWormhole
 )
 
 from scripts.deploy_wormhole_connector import (
@@ -67,7 +68,7 @@ def main():
 
     print('Deploying BridgeConnectorWormhole...')
 
-    bridge_connector_wormhole = deploy_wormhole_bridge_connector(token_bridge_wormhole.address, {'from': dev_multisig})
+    bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormhole, token_bridge_wormhole.address, {'from': dev_multisig})
 
     log.ok('Wormhole bridge connector', bridge_connector_wormhole.address)
     assert_equals('  wormhole_token_bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)

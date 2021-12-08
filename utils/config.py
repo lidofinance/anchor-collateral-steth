@@ -6,6 +6,9 @@ from brownie import network, accounts
 vault_proxy_address = '0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf'
 token_bridge_wormhole_address = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
 
+vault_ropsten_address = '0xf72b5bc0a05f15cadb6731e59c7d99c1bfbb2fab'
+token_bridge_wormhole_ropsten_address = '0xF174F9A837536C449321df1Ca093Bb96948D5386'
+
 gas_price = "90 gwei"
 
 def get_is_live():
