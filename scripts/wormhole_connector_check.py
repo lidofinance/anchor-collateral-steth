@@ -4,7 +4,8 @@ from brownie import (
     AnchorVault,
     AnchorVaultProxy,
     BridgeConnectorShuttle,
-    BridgeConnectorWormhole
+    BridgeConnectorWormhole,
+    BridgeConnectorWormholeRopsten
 )
 
 from scripts.deploy_wormhole_connector import (
@@ -16,8 +17,21 @@ import utils.log as log
 
 from utils.config import (
     get_is_live,
+    get_env, get_is_live,
+    vault_proxy_address,
+    vault_ropsten_address,
+    beth_token_address,
+    beth_token_ropsten_address,
+    ust_token_address,
+    ust_token_ropsten_address,
+    steth_token_address,
+    steth_token_ropsten_address,
+    bridge_connector_shuttle_address,
+    bridge_connector_shuttle_ropsten_address,
+    token_bridge_wormhole_ropsten_address,
     token_bridge_wormhole_address,
-    vault_proxy_address
+    wormhole_address,
+    wormhole_ropsten_address
 )
 
 from utils.mainnet_fork import chain_snapshot
@@ -30,18 +44,32 @@ def assert_equals(desc, actual, expected):
 
 
 def main():
-    dev_multisig = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
+    network = get_env('NETWORK', is_required=False, default="mainnet")
     
-    vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
-    vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
-    beth_token = bEth.at('0x707F9118e33A9B8998beA41dd0d46f38bb963FC8')
-    ust_token = interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
-    steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
-    bridge_connector_shuttle = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
-    token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)
+    
+    if network == "ropsten":
+        dev_multisig = '0x02139137fdd974181a49268d7b0ae888634e5469'
 
-    # Needed to properly decode LogMessagePublished events of Wormhole bridge
-    wormhole = interface.Wormhole('0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B')
+        vault = interface.AnchorVaultRopsten(vault_ropsten_address)
+        beth_token = bEth.at(beth_token_ropsten_address)
+        ust_token = interface.ERC20(ust_token_ropsten_address)
+        steth_token = interface.Lido(steth_token_ropsten_address)
+        bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_ropsten_address)
+        token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_ropsten_address)
+
+        # Needed to properly decode LogMessagePublished events of Wormhole bridge
+        wormhole = interface.Wormhole(wormhole_ropsten_address)
+    else:
+        dev_multisig = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
+
+        vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
+        vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
+        beth_token = bEth.at(beth_token_address)
+        ust_token = interface.ERC20(ust_token_address)
+        steth_token = interface.Lido(steth_token_address)
+        bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_address)
+        token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)
+        wormhole = interface.Wormhole(wormhole_address)
 
     log.ok('dev multisig', dev_multisig)
 
@@ -68,7 +96,10 @@ def main():
 
     print('Deploying BridgeConnectorWormhole...')
 
-    bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormhole, token_bridge_wormhole.address, {'from': dev_multisig})
+    if network == "ropsten":
+        bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormholeRopsten, token_bridge_wormhole.address, {'from': dev_multisig})
+    else:
+        bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormhole, token_bridge_wormhole.address, {'from': dev_multisig})
 
     log.ok('Wormhole bridge connector', bridge_connector_wormhole.address)
     assert_equals('  wormhole_token_bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)
@@ -109,38 +140,45 @@ def main():
         assert 'LogMessagePublished' in tx.events
         
         reference_payload = "0x01" # payloadId
-        reference_payload += "000000000000000000000000000000000000000000000000000000000bebc200" # amount 
-        reference_payload += "000000000000000000000000707f9118e33a9b8998bea41dd0d46f38bb963fc8" # tokenAddress
-        reference_payload += "0002" # tokenChain
+        reference_payload += "000000000000000000000000000000000000000000000000000000000bebc200" # amount
+        if network == "ropsten":
+            reference_payload += "000000000000000000000000" + beth_token_ropsten_address[2:].lower() # tokenAddress
+            reference_payload += "2711" # tokenChain 
+        else:
+            reference_payload += "000000000000000000000000" + beth_token_address[2:].lower() # tokenAddress
+            reference_payload += "0002" # tokenChain
         reference_payload += "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd" # to
         reference_payload += "0003" # toChain
         reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
-        
+
         assert str(tx.events['LogMessagePublished']['payload']) == reference_payload
 
         log.ok('bridge bETH balance', bridge_balance / 10**18)
 
         print()
 
-        print('Selling rewards...')
+        if network == "ropsten":
+            pass
+        else:
+            print('Selling rewards...')
 
-        burner = accounts.add()
-        voting_app = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
-        acl = interface.ACL('0x9895F0F17cc1d1891b6f18ee0b483B6f221b37Bb')
-        acl.grantPermission(burner, steth_token, steth_token.BURN_ROLE(), {'from': voting_app})
+            burner = accounts.add()
+            voting_app = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
+            acl = interface.ACL('0x9895F0F17cc1d1891b6f18ee0b483B6f221b37Bb')
+            acl.grantPermission(burner, steth_token, steth_token.BURN_ROLE(), {'from': voting_app})
 
-        steth_token.burnShares(holder_1, steth_token.getSharesByPooledEth(1 * 5**18), {'from': burner})
+            steth_token.burnShares(holder_1, steth_token.getSharesByPooledEth(1 * 5**18), {'from': burner})
 
-        tx = vault.collect_rewards({'from': liquidations_admin})
-        tx.info()
+            tx = vault.collect_rewards({'from': liquidations_admin})
+            tx.info()
 
-        assert 'LogMessagePublished' in tx.events
-        # reference_payload = "0x01" # payloadId
-        # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
-        reference_payload = "000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd" # tokenAddress
-        reference_payload += "0002" # tokenChain
-        reference_payload += "2c4ab12675bccba793170e21285f8793611135df000000000000000000000000" # to
-        reference_payload += "0003" # toChain
-        reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
-        
-        assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
+            assert 'LogMessagePublished' in tx.events
+            # reference_payload = "0x01" # payloadId
+            # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
+            reference_payload = "000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd" # tokenAddress
+            reference_payload += "0002" # tokenChain
+            reference_payload += "2c4ab12675bccba793170e21285f8793611135df000000000000000000000000" # to
+            reference_payload += "0003" # toChain
+            reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
+            
+            assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
