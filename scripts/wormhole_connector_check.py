@@ -68,7 +68,13 @@ def run_ropsten():
     assert_equals('  admin', vault.admin(), dev_multisig)
     assert_equals('  beth_token', vault.beth_token(), beth_token.address)
     assert_equals('  steth_token', vault.steth_token(), steth_token.address)
-    assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_shuttle.address)
+
+    if vault.bridge_connector() == bridge_connector_shuttle.address:
+        log.ok('  bridge_connector', vault.bridge_connector())
+    else:
+        print()
+        print('AnchorVault.bridge_connector is set to other location than known shuttle connector. Exiting...')
+        return
 
     print()
 
@@ -183,7 +189,13 @@ def run_mainnet():
     assert_equals('  admin', vault.admin(), dev_multisig)
     assert_equals('  beth_token', vault.beth_token(), beth_token.address)
     assert_equals('  steth_token', vault.steth_token(), steth_token.address)
-    assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_shuttle.address)
+
+    if vault.bridge_connector() == bridge_connector_shuttle.address:
+        log.ok('  bridge_connector', vault.bridge_connector())
+    else:
+        print()
+        print('AnchorVault.bridge_connector is set to other location than known shuttle connector. Exiting...')
+        return
 
     print()
 
