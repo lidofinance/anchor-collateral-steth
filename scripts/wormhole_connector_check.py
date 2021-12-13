@@ -16,7 +16,7 @@ import utils.log as log
 
 from utils.config import (
     get_is_live,
-    get_env, get_is_live,
+    get_env, 
     vault_proxy_address,
     vault_ropsten_address,
     beth_token_address,
@@ -49,7 +49,7 @@ def main():
     if network == "ropsten":
         dev_multisig = '0x02139137fdd974181a49268d7b0ae888634e5469'
 
-        vault = interface.AnchorVaultRopsten(vault_ropsten_address)
+        vault = AnchorVault.at(vault_ropsten_address)
         beth_token = bEth.at(beth_token_ropsten_address)
         ust_token = interface.ERC20(ust_token_ropsten_address)
         steth_token = interface.LidoRopsten(steth_token_ropsten_address)
@@ -96,7 +96,6 @@ def main():
     print('Deploying BridgeConnectorWormhole...')
 
     bridge_connector_wormhole = deploy_wormhole_bridge_connector(
-        BridgeConnectorWormhole, 
         token_bridge_wormhole.address, 
         beth_token.address,
         ust_token.address,

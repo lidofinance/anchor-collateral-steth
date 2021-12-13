@@ -19,14 +19,13 @@ from utils.config import (
 )
 
 def deploy_wormhole_bridge_connector(
-    contract,
     token_bridge_wormhole,
     beth_token,
     ust_wrapper_token,
     tx_params,
     publish_source=False,
 ):
-    connector = contract.deploy(
+    connector = BridgeConnectorWormhole.deploy(
         token_bridge_wormhole,
         beth_token,
         ust_wrapper_token,
@@ -57,9 +56,13 @@ def main():
 
     if network == "ropsten":
         vault = interface.AnchorVaultRopsten(vault_ropsten_address)
+        beth_token = beth_token_ropsten_address
+        ust_wrapper_token = ust_token_ropsten_address
         bridge_address = token_bridge_wormhole_ropsten_address
     else:
         vault = Contract.from_abi('AnchorVault', vault_proxy_address, AnchorVault.abi)
+        beth_token = beth_token_address
+        ust_wrapper_token = ust_token_address
         bridge_address = token_bridge_wormhole_address
     
 
@@ -77,10 +80,9 @@ def main():
         return
 
     connector = deploy_wormhole_bridge_connector(
-        BridgeConnectorWormhole,
         bridge_address,
-        beth_token_address,
-        ust_token_address,
+        beth_token,
+        ust_wrapper_token,
         tx_params={'from': deployer, 'gas_price': Wei(gas_price), 'required_confs': 1},
         publish_source=is_live
     )
