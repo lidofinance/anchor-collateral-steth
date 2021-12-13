@@ -4,6 +4,7 @@ from brownie import reverts
 TERRA_CHAIN_ID = 3
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 BETH_TOKEN = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
+UST_WRAPPER_TOKEN = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
 
 @pytest.fixture(scope='module')
 def bridge_connector(
@@ -13,6 +14,8 @@ def bridge_connector(
 ):
     return BridgeConnectorWormhole.deploy(
         mock_wormhole_token_bridge,
+        BETH_TOKEN,
+        UST_WRAPPER_TOKEN,
         {'from': deployer}
     )
 

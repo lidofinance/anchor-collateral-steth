@@ -96,10 +96,13 @@ def main():
 
     print('Deploying BridgeConnectorWormhole...')
 
-    if network == "ropsten":
-        bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormholeRopsten, token_bridge_wormhole.address, {'from': dev_multisig})
-    else:
-        bridge_connector_wormhole = deploy_wormhole_bridge_connector(BridgeConnectorWormhole, token_bridge_wormhole.address, {'from': dev_multisig})
+    bridge_connector_wormhole = deploy_wormhole_bridge_connector(
+        BridgeConnectorWormhole, 
+        token_bridge_wormhole.address, 
+        beth_token.address,
+        ust_token.address,
+        {'from': dev_multisig}
+    )
 
     log.ok('Wormhole bridge connector', bridge_connector_wormhole.address)
     assert_equals('  wormhole_token_bridge', bridge_connector_wormhole.wormhole_token_bridge(), token_bridge_wormhole.address)
