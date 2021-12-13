@@ -5,7 +5,6 @@ from brownie import (
     AnchorVaultProxy,
     BridgeConnectorShuttle,
     BridgeConnectorWormhole,
-    BridgeConnectorWormholeRopsten
 )
 
 from scripts.deploy_wormhole_connector import (
@@ -53,7 +52,7 @@ def main():
         vault = interface.AnchorVaultRopsten(vault_ropsten_address)
         beth_token = bEth.at(beth_token_ropsten_address)
         ust_token = interface.ERC20(ust_token_ropsten_address)
-        steth_token = interface.Lido(steth_token_ropsten_address)
+        steth_token = interface.LidoRopsten(steth_token_ropsten_address)
         bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_ropsten_address)
         token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_ropsten_address)
 
@@ -117,7 +116,6 @@ def main():
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
 
     with chain_snapshot():
-        liquidations_admin = accounts.at('0x1A9967A7b0c3dd39962296E53F5cf56471385dF2', force=True)
 
         print()
 
@@ -161,8 +159,28 @@ def main():
         print()
 
         if network == "ropsten":
-            pass
+            liquidations_admin = accounts.at('0x02139137fdd974181a49268d7b0ae888634e5469', force=True)
+
+            print('Selling rewards...')
+
+            steth_token.simulateBeaconRewards({'from': liquidations_admin})
+
+            tx = vault.collect_rewards({'from': liquidations_admin})
+            tx.info()
+
+            assert 'LogMessagePublished' in tx.events
+
+            # reference_payload = "0x01"
+            # reference_payload += "00000000000000000000000000000000000000000000000000000002dd8dedd2"
+            reference_payload = "0000000000000000000000006ca13a4ab78dd7d657226b155873a04db929a3a4"
+            reference_payload += "2711" # tokenChain
+            reference_payload += "976309db2db556f107c28fe4d7eab7c7e676c194000000000000000000000000" # to
+            reference_payload += "0003" # toChain
+            reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
+            
+            assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
         else:
+            liquidations_admin = accounts.at('0x1A9967A7b0c3dd39962296E53F5cf56471385dF2', force=True)
             print('Selling rewards...')
 
             burner = accounts.add()
