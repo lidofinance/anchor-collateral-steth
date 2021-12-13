@@ -6,7 +6,8 @@ from brownie import BridgeConnectorWormhole
 from utils.config import (
     gas_price,
     get_deployer_account,
-    get_env, get_is_live,
+    get_env, 
+    get_is_live,
     prompt_bool,
     token_bridge_wormhole_address,
     token_bridge_wormhole_ropsten_address,
@@ -55,7 +56,7 @@ def main():
         deployer.transfer(changer, Wei("2 ether"))
 
     if network == "ropsten":
-        vault = interface.AnchorVaultRopsten(vault_ropsten_address)
+        vault = AnchorVault.at(vault_ropsten_address)
         beth_token = beth_token_ropsten_address
         ust_wrapper_token = ust_token_ropsten_address
         bridge_address = token_bridge_wormhole_ropsten_address
