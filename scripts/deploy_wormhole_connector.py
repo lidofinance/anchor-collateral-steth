@@ -1,7 +1,7 @@
 import sys
 
-from brownie import interface, Contract, AnchorVault, Wei
-from brownie import BridgeConnectorWormhole
+from brownie import interface, Contract, AnchorVault, Wei, network as brownie_network
+from brownie import BridgeConnectorWormhole, accounts
 
 from utils.config import (
     gas_price,
@@ -49,8 +49,8 @@ def switch_bridge_connector_in_vault(vault, connector, tx_params):
 def main():
     is_live = get_is_live()
     deployer = get_deployer_account(is_live)
-    changer = get_env('CHANGER')
-    network = get_env('NETWORK', is_required=False, default="mainnet")
+    changer = accounts.load(get_env('CHANGER'))
+    network = brownie_network.show_active()
 
     if not is_live:
         deployer.transfer(changer, Wei("2 ether"))
@@ -85,7 +85,7 @@ def main():
         beth_token,
         ust_wrapper_token,
         tx_params={'from': deployer, 'gas_price': Wei(gas_price), 'required_confs': 1},
-        publish_source=is_live
+        publish_source=False
     )
 
     switch_bridge_connector_in_vault(

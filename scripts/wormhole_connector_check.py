@@ -1,4 +1,4 @@
-from brownie import interface, accounts, Contract, ZERO_ADDRESS
+from brownie import interface, accounts, Contract, ZERO_ADDRESS, network as brownie_network
 from brownie import (
     bEth,
     AnchorVault,
@@ -276,7 +276,7 @@ def run_mainnet():
         assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
 
 def main():
-    network = get_env('NETWORK', is_required=False, default="mainnet")
+    network = brownie_network.show_active()
     
     if network == "ropsten":
         run_ropsten()
