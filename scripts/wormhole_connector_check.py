@@ -1,4 +1,4 @@
-from brownie import interface, accounts, Contract, ZERO_ADDRESS, network as brownie_network
+from brownie import interface, accounts, Contract, ZERO_ADDRESS
 from brownie import (
     bEth,
     AnchorVault,
@@ -80,7 +80,7 @@ def run_ropsten():
 
     if get_is_live():
         print('Running on a live network, cannot run further checks.')
-        print('Run on a mainnet fork to do this.')
+        print('Run on a ropsten fork to do this.')
         return
 
     print('Deploying BridgeConnectorWormhole...')
@@ -288,9 +288,9 @@ def run_mainnet():
         assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
 
 def main():
-    network = brownie_network.show_active()
+    net = get_env("NET", False, None, "mainnet")
     
-    if network == "ropsten":
+    if net == "ropsten":
         run_ropsten()
     else:
         run_mainnet()

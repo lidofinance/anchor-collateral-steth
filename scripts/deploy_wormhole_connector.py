@@ -1,6 +1,6 @@
 import sys
 
-from brownie import interface, Contract, AnchorVault, Wei, network as brownie_network
+from brownie import Contract, AnchorVault, Wei, network
 from brownie import BridgeConnectorWormhole, accounts
 
 from utils.config import (
@@ -50,12 +50,12 @@ def main():
     is_live = get_is_live()
     deployer = get_deployer_account(is_live)
     changer = accounts.load(get_env('CHANGER'))
-    network = brownie_network.show_active()
+    net = network.show_active()
 
     if not is_live:
         deployer.transfer(changer, Wei("2 ether"))
 
-    if network == "ropsten":
+    if net == "ropsten":
         vault = AnchorVault.at(vault_ropsten_address)
         beth_token = beth_token_ropsten_address
         ust_wrapper_token = ust_token_ropsten_address
@@ -65,7 +65,6 @@ def main():
         beth_token = beth_token_address
         ust_wrapper_token = ust_token_address
         bridge_address = token_bridge_wormhole_address
-    
 
     print('Deployer:', deployer)
     print('Bridge connector changer:', changer)
