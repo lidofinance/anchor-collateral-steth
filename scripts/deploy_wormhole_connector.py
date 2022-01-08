@@ -15,8 +15,8 @@ from utils.config import (
     vault_ropsten_address,
     beth_token_address,
     beth_token_ropsten_address,
-    ust_token_address,
-    ust_token_ropsten_address,
+    ust_shuttle_token_address,
+    ust_shuttle_token_ropsten_address,
 )
 
 def deploy_wormhole_bridge_connector(
@@ -58,12 +58,12 @@ def main():
     if net == "ropsten":
         vault = AnchorVault.at(vault_ropsten_address)
         beth_token = beth_token_ropsten_address
-        ust_wrapper_token = ust_token_ropsten_address
+        ust_wrapper_token = ust_shuttle_token_ropsten_address
         bridge_address = token_bridge_wormhole_ropsten_address
     else:
         vault = Contract.from_abi('AnchorVault', vault_proxy_address, AnchorVault.abi)
         beth_token = beth_token_address
-        ust_wrapper_token = ust_token_address
+        ust_wrapper_token = ust_shuttle_token_address
         bridge_address = token_bridge_wormhole_address
 
     print('Deployer:', deployer)

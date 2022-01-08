@@ -21,8 +21,9 @@ from utils.config import (
     vault_ropsten_address,
     beth_token_address,
     beth_token_ropsten_address,
-    ust_token_address,
-    ust_token_ropsten_address,
+    ust_shuttle_token_address,
+    ust_shuttle_token_ropsten_address,
+    ust_wormhole_token_ropsten_address,
     steth_token_address,
     steth_token_ropsten_address,
     bridge_connector_shuttle_address,
@@ -30,7 +31,9 @@ from utils.config import (
     token_bridge_wormhole_ropsten_address,
     token_bridge_wormhole_address,
     wormhole_address,
-    wormhole_ropsten_address
+    wormhole_ropsten_address,
+    mock_liquidator_shuttle_ropsten,
+    mock_liquidator_wormhole_ropsten,
 )
 
 from utils.mainnet_fork import chain_snapshot
@@ -46,7 +49,7 @@ def run_ropsten():
 
     vault = AnchorVault.at(vault_ropsten_address)
     beth_token = bEth.at(beth_token_ropsten_address)
-    ust_token = interface.ERC20(ust_token_ropsten_address)
+    ust_token = interface.ERC20(ust_shuttle_token_ropsten_address)
     steth_token = interface.LidoRopsten(steth_token_ropsten_address)
     bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_ropsten_address)
     token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_ropsten_address)
@@ -104,6 +107,15 @@ def run_ropsten():
     log.ok('AnchorVault', vault.address)
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
 
+    print('Changing rewards liquidator on vault...')
+
+    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), mock_liquidator_shuttle_ropsten)
+
+    vault.set_rewards_liquidator(mock_liquidator_wormhole_ropsten, {'from': dev_multisig})
+
+    log.ok('AnchorVault', vault.address)
+    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), mock_liquidator_wormhole_ropsten)
+
     with chain_snapshot():
         print()
 
@@ -114,7 +126,7 @@ def run_ropsten():
 
         steth_token.submit(ZERO_ADDRESS, {'from': holder_1, 'value': 3 * 10**18})
         assert steth_token.balanceOf(holder_1) > 0
-        assert beth_token.balanceOf(token_bridge_wormhole) == 0
+        assert beth_token.balanceOf(token_bridge_wormhole) == 0.001 * 10 ** 18
         steth_token.approve(vault, 2 * 10**18, {'from': holder_1})
 
         tx = vault.submit(2 * 10**18, TERRA_ADDRESS, b'', {'from': holder_1})
@@ -122,7 +134,7 @@ def run_ropsten():
 
         bridge_balance = beth_token.balanceOf(token_bridge_wormhole)
 
-        assert bridge_balance == 2 * 10**18
+        assert bridge_balance == 2.001 * 10**18
         assert beth_token.balanceOf(holder_1) == 0
         assert beth_token.totalSupply() == beth_supply + 2 * 10**18
 
@@ -167,7 +179,7 @@ def run_mainnet():
     vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
     beth_token = bEth.at(beth_token_address)
-    ust_token = interface.ERC20(ust_token_address)
+    ust_token = interface.ERC20(ust_shuttle_token_address)
     steth_token = interface.Lido(steth_token_address)
     bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_address)
     token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)

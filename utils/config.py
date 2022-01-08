@@ -12,8 +12,11 @@ token_bridge_wormhole_ropsten_address = '0xF174F9A837536C449321df1Ca093Bb96948D5
 beth_token_address = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
 beth_token_ropsten_address = '0xA60100d5e12E9F83c1B04997314cf11685A618fF'
 
-ust_token_address = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
-ust_token_ropsten_address = '0x6cA13a4ab78dd7D657226b155873A04DB929A3A4'
+ust_shuttle_token_address = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
+ust_shuttle_token_ropsten_address = '0x6cA13a4ab78dd7D657226b155873A04DB929A3A4'
+
+ust_wormhole_token_address = ''
+ust_wormhole_token_ropsten_address = '0x67d574b0218DcA2eB790b5922C5dA6A7b77E25a5'
 
 steth_token_address = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'
 steth_token_ropsten_address = '0xd40EefCFaB888C9159a61221def03bF77773FC19'
@@ -23,6 +26,12 @@ bridge_connector_shuttle_ropsten_address = '0x0f49D26b45D0a9880431D33eAf7CCCb1Eb
 
 wormhole_address = '0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B'
 wormhole_ropsten_address = '0x210c5F5e2AF958B4defFe715Dc621b7a3BA888c5'
+
+steth_vault_address = '?'
+steth_vault_ropsten_address = '0xbf5e5e540e1d9e53980bdc9ffe677357b39f082f'
+
+mock_liquidator_shuttle_ropsten = '0x81c73492380ec87b464b2e53f7e7f9dd30c7ded9'
+mock_liquidator_wormhole_ropsten = '0x2A01EDF898cf667d5B6a734a9DF81dDd1E66C9a3'
 
 gas_price = "90 gwei"
 
