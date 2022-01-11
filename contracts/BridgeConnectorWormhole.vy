@@ -14,7 +14,7 @@ beth_token: public(address)
 ust_wrapper_token: public(address)
 
 @external
-def __init__(wormhole_token_bridge: address):
+def __init__(wormhole_token_bridge: address, beth_token: address, ust_wrapper_token: address):
     assert wormhole_token_bridge != ZERO_ADDRESS, "bridge is zero address"
 
     self.wormhole_token_bridge = wormhole_token_bridge
