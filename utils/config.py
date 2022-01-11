@@ -12,8 +12,8 @@ token_bridge_wormhole_ropsten_address = '0xF174F9A837536C449321df1Ca093Bb96948D5
 beth_token_address = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
 beth_token_ropsten_address = '0xA60100d5e12E9F83c1B04997314cf11685A618fF'
 
-ust_token_address = '0xa47c8bf37f92aBed4A126BDA807A7b7498661acD'
-ust_token_ropsten_address = '0x6cA13a4ab78dd7D657226b155873A04DB929A3A4'
+ust_token_address = '0xa693B19d2931d498c5B318dF961919BB4aee87a5'
+ust_token_ropsten_address = '0x67d574b0218DcA2eB790b5922C5dA6A7b77E25a5'
 
 steth_token_address = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'
 steth_token_ropsten_address = '0xd40EefCFaB888C9159a61221def03bF77773FC19'
