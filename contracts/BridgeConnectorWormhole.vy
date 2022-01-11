@@ -14,7 +14,9 @@ beth_token: public(address)
 ust_wrapper_token: public(address)
 
 @external
-def __init__(wormhole_token_bridge: address, beth_token: address, ust_wrapper_token: address):
+def __init__(wormhole_token_bridge: address):
+    assert wormhole_token_bridge != ZERO_ADDRESS, "bridge is zero address"
+
     self.wormhole_token_bridge = wormhole_token_bridge
     self.beth_token = beth_token
     self.ust_wrapper_token = ust_wrapper_token
@@ -30,6 +32,7 @@ def __init__(wormhole_token_bridge: address, beth_token: address, ust_wrapper_to
 #
 # See target method signature: https://etherscan.io/address/0x6c4c12987303b2c94b2c76c612fc5f4d2f0360f7#code#F2#L93
 @internal
+@payable
 def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipient: bytes32, _extra_data: Bytes[1024]):
     nonce: uint256 = 0
     arbiter_fee: uint256 = 0
@@ -42,7 +45,7 @@ def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipi
     if len(_extra_data) >= 64:
         arbiter_fee = extract32(_extra_data, 32, output_type=uint256)
 
-    ERC20(_asset).approve(_bridge, _amount)
+    assert ERC20(_asset).approve(_bridge, _amount)
 
     raw_call(
         _bridge,
@@ -54,17 +57,20 @@ def _transfer_asset(_bridge: address, _asset: address, _amount: uint256, _recipi
             _recipient,
             convert(arbiter_fee, bytes32),
             convert(nonce, bytes32)
-        )
+        ),
+        value=msg.value
     )
 
 
 # Submits amount of bETH tokens to Terra address via token bridge.
 @external
+@payable
 def forward_beth(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
     self._transfer_asset(self.wormhole_token_bridge, self.beth_token, _amount, _terra_address, _extra_data)
 
 # Submits amount of UST tokens to Terra address via token bridge.
 @external
+@payable
 def forward_ust(_terra_address: bytes32, _amount: uint256, _extra_data: Bytes[1024]):
     self._transfer_asset(self.wormhole_token_bridge, self.ust_wrapper_token, _amount, _terra_address, _extra_data)
 
