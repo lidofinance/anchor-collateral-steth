@@ -21,8 +21,8 @@ from utils.config import (
     vault_ropsten_address,
     beth_token_address,
     beth_token_ropsten_address,
-    ust_token_address,
-    ust_token_ropsten_address,
+    ust_wormhole_token_address,
+    ust_wormhole_token_ropsten_address,
     steth_token_address,
     steth_token_ropsten_address,
     bridge_connector_shuttle_address,
@@ -30,7 +30,9 @@ from utils.config import (
     token_bridge_wormhole_ropsten_address,
     token_bridge_wormhole_address,
     wormhole_address,
-    wormhole_ropsten_address
+    wormhole_ropsten_address,
+    mock_liquidator_shuttle_ropsten,
+    mock_liquidator_wormhole_ropsten,
 )
 
 from utils.mainnet_fork import chain_snapshot
@@ -46,7 +48,7 @@ def run_ropsten():
 
     vault = AnchorVault.at(vault_ropsten_address)
     beth_token = bEth.at(beth_token_ropsten_address)
-    ust_token = interface.ERC20(ust_token_ropsten_address)
+    ust_token = interface.ERC20(ust_wormhole_token_ropsten_address)
     steth_token = interface.LidoRopsten(steth_token_ropsten_address)
     bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_ropsten_address)
     token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_ropsten_address)
@@ -104,6 +106,15 @@ def run_ropsten():
     log.ok('AnchorVault', vault.address)
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
 
+    print('Changing rewards liquidator on vault...')
+
+    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), mock_liquidator_shuttle_ropsten)
+
+    vault.set_rewards_liquidator(mock_liquidator_wormhole_ropsten, {'from': dev_multisig})
+
+    log.ok('AnchorVault', vault.address)
+    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), mock_liquidator_wormhole_ropsten)
+
     with chain_snapshot():
         print()
 
@@ -113,16 +124,21 @@ def run_ropsten():
         holder_1 = accounts[0]
 
         steth_token.submit(ZERO_ADDRESS, {'from': holder_1, 'value': 3 * 10**18})
-        assert steth_token.balanceOf(holder_1) > 0
-        assert beth_token.balanceOf(token_bridge_wormhole) == 0
-        steth_token.approve(vault, 2 * 10**18, {'from': holder_1})
 
-        tx = vault.submit(2 * 10**18, TERRA_ADDRESS, b'', {'from': holder_1})
+        assert steth_token.balanceOf(holder_1) > 0
+
+        bridge_beth_balance_before = beth_token.balanceOf(token_bridge_wormhole)
+
+        value_to_submit = 2 * 10**18
+
+        steth_token.approve(vault, value_to_submit, {'from': holder_1})
+
+        tx = vault.submit(value_to_submit, TERRA_ADDRESS, b'', {'from': holder_1})
         tx.info()
 
-        bridge_balance = beth_token.balanceOf(token_bridge_wormhole)
+        bridge_beth_balance_after = beth_token.balanceOf(token_bridge_wormhole)
 
-        assert bridge_balance == 2 * 10**18
+        assert (bridge_beth_balance_after - bridge_beth_balance_before) == value_to_submit
         assert beth_token.balanceOf(holder_1) == 0
         assert beth_token.totalSupply() == beth_supply + 2 * 10**18
 
@@ -138,7 +154,7 @@ def run_ropsten():
 
         assert str(tx.events['LogMessagePublished']['payload']) == reference_payload
 
-        log.ok('bridge bETH balance', bridge_balance / 10**18)
+        log.ok('bridge bETH balance', bridge_beth_balance_after / 10**18)
 
         print()
 
@@ -151,14 +167,15 @@ def run_ropsten():
 
         assert 'LogMessagePublished' in tx.events
 
+        # See https://github.com/certusone/wormhole/blob/aff369ff4dcd7ec287bfe6b0778ee410f8bd9587/ethereum/contracts/bridge/Bridge.sol#L97-L103
         # reference_payload = "0x01" # payloadId
         # reference_payload += "00000000000000000000000000000000000000000000000000000002dd8dedd2" # amount
-        reference_payload = "0000000000000000000000006ca13a4ab78dd7d657226b155873a04db929a3a4" # tokenAddress
-        reference_payload += "2711" # tokenChain
+        reference_payload = "0100000000000000000000000000000000000000000000000000000075757364" # tokenAddress (UST native)
+        reference_payload += "0003" # tokenChain (Terra)
         reference_payload += "976309db2db556f107c28fe4d7eab7c7e676c194000000000000000000000000" # to
-        reference_payload += "0003" # toChain
+        reference_payload += "0003" # toChain (Terra)
         reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
-        
+
         assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
 
 def run_mainnet():
@@ -167,7 +184,7 @@ def run_mainnet():
     vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
     beth_token = bEth.at(beth_token_address)
-    ust_token = interface.ERC20(ust_token_address)
+    ust_token = interface.ERC20(ust_wormhole_token_address)
     steth_token = interface.Lido(steth_token_address)
     bridge_connector_shuttle = BridgeConnectorShuttle.at(bridge_connector_shuttle_address)
     token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)
@@ -234,16 +251,21 @@ def run_mainnet():
         holder_1 = accounts[0]
 
         steth_token.submit(ZERO_ADDRESS, {'from': holder_1, 'value': 3 * 10**18})
-        assert steth_token.balanceOf(holder_1) > 0
-        assert beth_token.balanceOf(token_bridge_wormhole) == 0
-        steth_token.approve(vault, 2 * 10**18, {'from': holder_1})
 
-        tx = vault.submit(2 * 10**18, TERRA_ADDRESS, b'', {'from': holder_1})
+        assert steth_token.balanceOf(holder_1) > 0
+
+        bridge_beth_balance_before = beth_token.balanceOf(token_bridge_wormhole)
+
+        value_to_submit = 2 * 10**18
+
+        steth_token.approve(vault, value_to_submit, {'from': holder_1})
+
+        tx = vault.submit(value_to_submit, TERRA_ADDRESS, b'', {'from': holder_1})
         tx.info()
 
-        bridge_balance = beth_token.balanceOf(token_bridge_wormhole)
+        bridge_beth_balance_after = beth_token.balanceOf(token_bridge_wormhole)
 
-        assert bridge_balance == 2 * 10**18
+        assert (bridge_beth_balance_after - bridge_beth_balance_before) == value_to_submit
         assert beth_token.balanceOf(holder_1) == 0
         assert beth_token.totalSupply() == beth_supply + 2 * 10**18
 
@@ -259,7 +281,7 @@ def run_mainnet():
 
         assert str(tx.events['LogMessagePublished']['payload']) == reference_payload
 
-        log.ok('bridge bETH balance', bridge_balance / 10**18)
+        log.ok('bridge bETH balance', bridge_beth_balance_after / 10**18)
 
         print()
 
@@ -272,17 +294,16 @@ def run_mainnet():
         acl.grantPermission(burner, steth_token, steth_token.BURN_ROLE(), {'from': voting_app})
 
         steth_token.burnShares(holder_1, steth_token.getSharesByPooledEth(1 * 5**18), {'from': burner})
-
         tx = vault.collect_rewards({'from': liquidations_admin})
         tx.info()
 
         assert 'LogMessagePublished' in tx.events
         # reference_payload = "0x01" # payloadId
         # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
-        reference_payload = "000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd" # tokenAddress
-        reference_payload += "0002" # tokenChain
+        reference_payload = "0100000000000000000000000000000000000000000000000000000075757364" # tokenAddress (UST native)
+        reference_payload += "0003" # tokenChain (Terra)
         reference_payload += "2c4ab12675bccba793170e21285f8793611135df000000000000000000000000" # to
-        reference_payload += "0003" # toChain
+        reference_payload += "0003" # toChain (Terra)
         reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
         
         assert str(tx.events['LogMessagePublished']['payload']).endswith(reference_payload)
