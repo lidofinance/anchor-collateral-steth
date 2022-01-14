@@ -41,8 +41,8 @@ event UniswapUSDCPoolFeeChanged:
     fee: uint256
 
 
-UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
-UST_TOKEN_DECIMALS: constant(uint256) = 18
+UST_TOKEN: constant(address) = 0xa693B19d2931d498c5B318dF961919BB4aee87a5
+UST_TOKEN_DECIMALS: constant(uint256) = 6
 USDC_TOKEN: constant(address) = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48
 USDC_TOKEN_DECIMALS: constant(uint256) = 6
 STETH_TOKEN: constant(address) = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84

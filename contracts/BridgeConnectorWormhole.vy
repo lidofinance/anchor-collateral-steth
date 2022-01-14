@@ -4,7 +4,7 @@
 from vyper.interfaces import ERC20
 
 BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
-UST_WRAPPER_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
+UST_WRAPPER_TOKEN: constant(address) = 0xa693B19d2931d498c5B318dF961919BB4aee87a5
 
 TERRA_CHAIN_ID: constant(uint256) = 3
 
