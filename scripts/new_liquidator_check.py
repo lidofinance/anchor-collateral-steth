@@ -12,6 +12,12 @@ from brownie import (
 import utils.log as log
 from utils.mainnet_fork import chain_snapshot
 
+from scripts.deploy_wormhole_connector import (
+    deploy_wormhole_bridge_connector,
+    switch_bridge_connector_in_vault,
+)
+
+from utils.config import token_bridge_wormhole_address
 
 def assert_equals(desc, actual, expected):
     assert actual == expected
@@ -19,6 +25,9 @@ def assert_equals(desc, actual, expected):
 
 
 def main():
+    dev_multisig = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
+    lido_deployer_3 = '0xe19fc582dd93FA876CF4061Eb5456F310144F57b'
+
     vault_proxy = AnchorVaultProxy.at('0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf')
     vault_impl = AnchorVault.at('0x0627054d17eAe63ec23C6d8b07d8Db7A66ffd45a')
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
@@ -27,8 +36,10 @@ def main():
     ust_token = interface.ERC20('0xa693B19d2931d498c5B318dF961919BB4aee87a5')
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
 
-    bridge_connector = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
-    old_rewards_liquidator = RewardsLiquidator.at('0xdb99Fdb42FEc8Ba414ea60b3a189208bBdbfa321')
+    bridge_connector = deploy_wormhole_bridge_connector(token_bridge_wormhole_address, {'from': dev_multisig})
+    switch_bridge_connector_in_vault(vault, bridge_connector, {'from': dev_multisig})
+
+    old_rewards_liquidator = RewardsLiquidator.at('0x082a5956D63b44685a7CCA89379D565C439fdf3C')
     insurance_connector = InsuranceConnector.at('0x2BDfD3De0fF23373B621CDAD0aD3dF1580efE701')
 
     terra_rewards_distributor = '0x2c4ab12675bccba793170e21285f8793611135df000000000000000000000000'
@@ -40,10 +51,7 @@ def main():
     new_liquidator_configured = new_liquidator_deployed and vault.rewards_liquidator() == new_rewards_liquidator.address
 
     print('loading liquidations admin account...')
-    liquidations_admin = accounts.load('anchor-mainnet-liquidator')
-
-    dev_multisig = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
-    lido_deployer_3 = '0xe19fc582dd93FA876CF4061Eb5456F310144F57b'
+    liquidations_admin = accounts.at(vault.liquidations_admin(), force=True)
 
     log.ok('dev multisig', dev_multisig)
 
@@ -93,13 +101,6 @@ def main():
 
     print()
 
-    log.ok('BridgeConnectorShuttle', bridge_connector.address)
-    assert_equals('  beth_token', bridge_connector.beth_token(), beth_token.address)
-    assert_equals('  beth_token_vault', bridge_connector.beth_token_vault(), beth_shuttle_vault.address)
-    assert_equals('  ust_wrapper_token', bridge_connector.ust_wrapper_token(), ust_token)
-
-    print()
-
     log.ok('InsuranceConnector', insurance_connector.address)
 
     print()
@@ -122,7 +123,7 @@ def main():
     with chain_snapshot():
         dev_multisig_acct = accounts.at(dev_multisig, force=True)
         lido_deployer_acct = accounts.at(lido_deployer_3, force=True)
-        bridge_balance_before = beth_token.balanceOf(beth_shuttle_vault)
+        bridge_balance_before = beth_token.balanceOf(token_bridge_wormhole_address)
 
         #liquidator upgrade
         max_steth_eth_price_difference_percent = 1.5
@@ -209,7 +210,7 @@ def main():
         tx = vault.submit(2 * 10**18, terra_recipient, b'', {'from': holder_1})
         tx.info()
 
-        bridge_balance = beth_token.balanceOf(beth_shuttle_vault)
+        bridge_balance = beth_token.balanceOf(token_bridge_wormhole_address)
 
         assert beth_token.balanceOf(holder_1) == 0
         assert bridge_balance > bridge_balance_before + (1.999 * 10**18)
@@ -226,7 +227,7 @@ def main():
         tx = vault.submit(2 * 10**18, terra_recipient, b'', {'from': holder_1, 'value': 2 * 10**18})
         tx.info()
 
-        bridge_balance = beth_token.balanceOf(beth_shuttle_vault)
+        bridge_balance = beth_token.balanceOf(token_bridge_wormhole_address)
 
         assert beth_token.balanceOf(holder_2) == 0
         assert bridge_balance > bridge_balance_before + (2 * 1.999 * 10**18)
