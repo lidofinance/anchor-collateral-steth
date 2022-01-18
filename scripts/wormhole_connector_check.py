@@ -157,6 +157,13 @@ def main():
         tx.info()
 
         assert 'LogMessagePublished' in tx.events
+
+        # See https://github.com/certusone/wormhole/blob/aff369ff4dcd7ec287bfe6b0778ee410f8bd9587/ethereum/contracts/bridge/Bridge.sol#L97-L103
+        # See https://etherscan.io/address/0xa693B19d2931d498c5B318dF961919BB4aee87a5#readProxyContract
+        # For the native currency, token bridge is altering "from chain" and "token address" to the native values.
+        # Wrapped contracts have chainId() and nativeContract() getters to provide data for tweaking the payload.
+        # Consider values of mentioned getters in Wormhole UST token to understand the payload below.
+
         # reference_payload = "0x01" # payloadId
         # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
         reference_payload = "0100000000000000000000000000000000000000000000000000000075757364" # tokenAddress
