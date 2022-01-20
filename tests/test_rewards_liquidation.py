@@ -12,7 +12,7 @@ MAX_USDC_UST_PRICE_DIFF_PERCENT = 3
 MAX_STETH_UST_PRICE_DIFF_PERCENT = 5
 
 CURVE_STETH_POOL = "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022"
-CURVE_UST_POOL = "0x890f4e345B1dAED0367A877a1612f86A1f86985f"
+CURVE_UST_POOL = "0xCEAF7747579696A2F0bb206a14210e3c9e6fB269"
 CURVE_USDC_POOL = "0xB0a0716841F2Fc03fbA72A891B8Bb13584F52F2d"
 CURVE_ETH_INDEX = 0
 CURVE_STETH_INDEX = 1
@@ -248,7 +248,7 @@ def test_fails_on_excess_usdc_ust_price_change(
     usdc_token.approve(usdc_pool, liquidity_amount, {"from": whale})
     usdc_pool.add_liquidity([0, 0, liquidity_amount, 0], 0, {"from": whale})
 
-    pool_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6) / 10 ** 18
+    pool_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6) / 10 ** 6
     print("pool usdc->ust price", pool_price)
     assert feed_price * ((100 - MAX_USDC_UST_PRICE_DIFF_PERCENT) / 100) >= pool_price
 

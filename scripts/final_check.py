@@ -25,7 +25,7 @@ def main():
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
     beth_token = bEth.at('0x707F9118e33A9B8998beA41dd0d46f38bb963FC8')
     beth_shuttle_vault = interface.ShuttleVault('0xF9dcf31EE6EB94AB732A43c2FbA1dC6179c98965')
-    ust_token = interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
+    ust_token = interface.ERC20('0xa693B19d2931d498c5B318dF961919BB4aee87a5')
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
 
     bridge_connector = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')

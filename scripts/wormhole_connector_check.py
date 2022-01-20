@@ -4,6 +4,7 @@ from brownie import (
     AnchorVault,
     AnchorVaultProxy,
     BridgeConnectorShuttle,
+    RewardsLiquidator,
 )
 
 from scripts.deploy_wormhole_connector import (
@@ -34,7 +35,7 @@ def main():
     vault_proxy = AnchorVaultProxy.at(vault_proxy_address)
     vault = Contract.from_abi('AnchorVault', vault_proxy.address, AnchorVault.abi)
     beth_token = bEth.at('0x707F9118e33A9B8998beA41dd0d46f38bb963FC8')
-    ust_token = interface.ERC20('0xa47c8bf37f92aBed4A126BDA807A7b7498661acD')
+    ust_token = interface.ERC20('0xa693B19d2931d498c5B318dF961919BB4aee87a5')
     steth_token = interface.Lido('0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84')
     bridge_connector_shuttle = BridgeConnectorShuttle.at('0x513251faB2542532753972B8FE9A7b60621affaD')
     token_bridge_wormhole = interface.Bridge(token_bridge_wormhole_address)
@@ -78,8 +79,30 @@ def main():
 
     switch_bridge_connector_in_vault(vault, bridge_connector_wormhole, {'from': dev_multisig})
 
+    print('Deploying RewardsLiquidator...')
+
+    rewards_liquidator = RewardsLiquidator.deploy(
+        vault, 
+        dev_multisig, 
+        15000000000000000,
+        30000000000000000,
+        30000000000000000,
+        50000000000000000,
+        {'from': dev_multisig}
+    )
+
+    log.ok('RewardsLiquidator', rewards_liquidator.address)
+
+    print()
+
+    print('Changing rewards liquidator on vault...')
+
+    tx = vault.set_rewards_liquidator(rewards_liquidator, {'from': dev_multisig})
+    tx.info()
+
     log.ok('AnchorVault', vault.address)
     assert_equals('  bridge_connector', vault.bridge_connector(), bridge_connector_wormhole.address)
+    assert_equals('  rewards_liquidator', vault.rewards_liquidator(), rewards_liquidator.address)
 
     with chain_snapshot():
         liquidations_admin = accounts.at('0x1A9967A7b0c3dd39962296E53F5cf56471385dF2', force=True)
@@ -134,10 +157,17 @@ def main():
         tx.info()
 
         assert 'LogMessagePublished' in tx.events
+
+        # See https://github.com/certusone/wormhole/blob/aff369ff4dcd7ec287bfe6b0778ee410f8bd9587/ethereum/contracts/bridge/Bridge.sol#L97-L103
+        # See https://etherscan.io/address/0xa693B19d2931d498c5B318dF961919BB4aee87a5#readProxyContract
+        # For the native currency, token bridge is altering "from chain" and "token address" to the native values.
+        # Wrapped contracts have chainId() and nativeContract() getters to provide data for tweaking the payload.
+        # Consider values of mentioned getters in Wormhole UST token to understand the payload below.
+
         # reference_payload = "0x01" # payloadId
         # reference_payload += "0000000000000000000000000000000000000000000000000000000000016b06" # amount 
-        reference_payload = "000000000000000000000000a47c8bf37f92abed4a126bda807a7b7498661acd" # tokenAddress
-        reference_payload += "0002" # tokenChain
+        reference_payload = "0100000000000000000000000000000000000000000000000000000075757364" # tokenAddress
+        reference_payload += "0003" # tokenChain
         reference_payload += "2c4ab12675bccba793170e21285f8793611135df000000000000000000000000" # to
         reference_payload += "0003" # toChain
         reference_payload += "0000000000000000000000000000000000000000000000000000000000000000" # fee
