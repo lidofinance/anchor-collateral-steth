@@ -93,3 +93,10 @@ def cancel_migration():
     AnchorVault(ANCHOR_VAULT).change_admin(self.pre_migration_admin)
 
     log MigrationCancelled()
+
+
+@external
+def destroy():
+    self._assert_authorized(msg.sender)
+    assert self.state >= STATE_MIGRATION_FINISHED, "invalid state"
+    selfdestruct(msg.sender)
