@@ -1,4 +1,4 @@
-# @version 0.2.16
+# @version 0.3.1
 # @author skozin <info@lido.fi>
 # @licence MIT
 
@@ -19,8 +19,8 @@ event MigrationCancelled: pass
 ANCHOR_VAULT: constant(address) = 0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf
 LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
 
-NEW_REWARDS_LIQUIDATOR: constant(address) = 0x8bAdf00d8bADF00D8Badf00D8BADf00D8Badf00d # FIXME
-NEW_BRIDGE_CONNECTOR: constant(address) = 0x8bAdf00d8bADF00D8Badf00D8BADf00D8Badf00d # FIXME
+NEW_REWARDS_LIQUIDATOR: immutable(address)
+NEW_BRIDGE_CONNECTOR: immutable(address)
 NEW_ANCHOR_REWARDS_DISTRIBUTOR: constant(bytes32) = 0x0000000000000000000000002c4ab12675bccba793170e21285f8793611135df
 
 STATE_MIGRATION_NOT_STARTED: constant(uint256) = 0
@@ -37,7 +37,9 @@ pre_migration_bridge_connector: public(address)
 
 
 @external
-def __init__():
+def __init__(new_rewards_liquidator: address, new_bridge_connector: address):
+    NEW_REWARDS_LIQUIDATOR = new_rewards_liquidator
+    NEW_BRIDGE_CONNECTOR = new_bridge_connector
     self.executor = msg.sender
     self.pre_migration_admin = AnchorVault(ANCHOR_VAULT).admin()
 
