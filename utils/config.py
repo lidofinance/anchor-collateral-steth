@@ -3,8 +3,35 @@ import sys
 
 from brownie import network, accounts
 
-vault_proxy_address = '0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf'
-token_bridge_wormhole_address = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
+# external addresses
+ust_token_addr = '0xa693B19d2931d498c5B318dF961919BB4aee87a5'
+steth_token_addr = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'
+lido_dao_voting_addr = '0x2e59A20f205bB85a89C53f1936454680651E618e'
+wormhole_addr = '0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B'
+wormhole_token_bridge_addr = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
+
+# intergration addresses
+vault_proxy_addr = '0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf'
+vault_impl_addr = '0x0627054d17eAe63ec23C6d8b07d8Db7A66ffd45a'
+beth_token_addr = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
+bridge_connector_addr = '0x513251faB2542532753972B8FE9A7b60621affaD'
+rewards_liquidator_addr = '0x082a5956D63b44685a7CCA89379D565C439fdf3C'
+insurance_connector_addr = '0x2BDfD3De0fF23373B621CDAD0aD3dF1580efE701'
+dev_multisig_addr = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
+vault_liquidations_admin_addr = '0x1A9967A7b0c3dd39962296E53F5cf56471385dF2'
+
+# Terra addresses
+terra_rewards_distributor_addr = '0x2c4ab12675bccba793170e21285f8793611135df'
+
+# intergation params
+rew_liq_max_steth_eth_price_difference_percent = 1.5
+rew_liq_max_eth_usdc_price_difference_percent = 3
+rew_liq_max_usdc_ust_price_difference_percent = 3
+rew_liq_max_steth_ust_price_difference_percent = 5
+
+# Wormhole migration addresses
+wh_migrator_addr = None
+wh_migration_executor_addr = None
 
 gas_price = "90 gwei"
 
