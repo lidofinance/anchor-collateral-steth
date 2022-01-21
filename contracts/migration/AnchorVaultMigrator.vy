@@ -17,7 +17,6 @@ event MigrationCancelled: pass
 
 
 ANCHOR_VAULT: constant(address) = 0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf
-LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
 
 NEW_REWARDS_LIQUIDATOR: immutable(address)
 NEW_BRIDGE_CONNECTOR: immutable(address)
@@ -47,7 +46,7 @@ def __init__(new_rewards_liquidator: address, new_bridge_connector: address):
 @internal
 @view
 def _assert_authorized(msg_sender: address):
-    assert msg_sender == LIDO_DAO_AGENT or msg_sender == self.executor, "unauthorized"
+    assert msg_sender == self.pre_migration_admin or msg_sender == self.executor, "unauthorized"
 
 
 @external
@@ -75,7 +74,7 @@ def finish_migration():
     AnchorVault(ANCHOR_VAULT).set_rewards_liquidator(NEW_REWARDS_LIQUIDATOR)
     AnchorVault(ANCHOR_VAULT).set_anchor_rewards_distributor(NEW_ANCHOR_REWARDS_DISTRIBUTOR)
 
-    AnchorVault(ANCHOR_VAULT).change_admin(LIDO_DAO_AGENT)
+    AnchorVault(ANCHOR_VAULT).change_admin(self.pre_migration_admin)
 
     log MigrationFinished()
 
