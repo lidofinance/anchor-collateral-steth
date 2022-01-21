@@ -85,7 +85,7 @@ def cancel_migration():
 
     prev_state: uint256 = self.state
     assert prev_state <= STATE_MIGRATION_STARTED, "invalid state"
-    self.state = STATE_MIGRATION_FINISHED
+    self.state = STATE_MIGRATION_CANCELLED
 
     if prev_state == STATE_MIGRATION_STARTED:
         AnchorVault(ANCHOR_VAULT).set_bridge_connector(self.pre_migration_bridge_connector)
