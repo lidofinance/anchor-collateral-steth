@@ -238,13 +238,6 @@ def test_cannot_start_migration_after_finish(migrator, executor_1, executor_2):
         migrator.start_migration({'from': executor_2})
 
 
-def test_cannot_start_migration_after_finish(migrator, executor_1, executor_2):
-    migrator.start_migration({'from': executor_1})
-    migrator.finish_migration({'from': executor_1})
-    with reverts('invalid state'):
-        migrator.start_migration({'from': executor_2})
-
-
 def test_cannot_cancel_migration_after_finish(migrator, executor_1, executor_2):
     migrator.start_migration({'from': executor_1})
     migrator.finish_migration({'from': executor_1})
