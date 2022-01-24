@@ -118,11 +118,13 @@ def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector
 def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
     return MockRewardsLiquidator.deploy({'from': deployer})
 
+@pytest.fixture(scope='module')
+def mock_self_owned_steth_burner(MockSelfOwnedStETHBurner, deployer):
+    return MockSelfOwnedStETHBurner.deploy({'from': deployer})
 
 @pytest.fixture(scope='module')
-def mock_insurance_connector(MockInsuranceConnector, deployer):
-    return MockInsuranceConnector.deploy({'from': deployer})
-
+def mock_insurance_connector(mock_self_owned_steth_burner, deployer, InsuranceConnector):
+    return InsuranceConnector.deploy(mock_self_owned_steth_burner, {'from': deployer})
 
 @pytest.fixture(scope='module')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
