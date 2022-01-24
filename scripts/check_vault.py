@@ -119,9 +119,6 @@ def check_vault(
 
     print()
 
-    max_eth_price_difference_percent = 1
-    max_steth_price_difference_percent = 5.25
-
     log.ok('RewardsLiquidator', rewards_liquidator.address)
     assert_equals('  admin', rewards_liquidator.admin(), vault_admin)
     assert_equals('  vault', rewards_liquidator.vault(), vault_proxy.address)
