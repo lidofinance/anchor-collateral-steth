@@ -130,6 +130,17 @@ def initialize(beth_token: address, steth_token: address, admin: address):
 
 
 @external
+@pure
+def version() -> uint256:
+    return 2
+
+
+@internal
+def _assert_version(_expected_version: uint256):
+    assert _expected_version == 2 # dev: unexpected contract version
+
+
+@external
 def change_admin(new_admin: address):
     """
     @dev Changes the admin address. Can only be called by the current admin address.
@@ -340,7 +351,12 @@ def can_deposit_or_withdraw() -> bool:
 
 @external
 @payable
-def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) -> (uint256, uint256):
+def submit(
+    _amount: uint256,
+    _terra_address: bytes32,
+    _extra_data: Bytes[1024],
+    _expected_version: uint256
+) -> (uint256, uint256):
     """
     @dev Locks the `_amount` of provided ETH or stETH tokens in return for bETH tokens
          minted to the `_terra_address` address on the Terra blockchain.
@@ -357,6 +373,7 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) 
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
+    self._assert_version(_expected_version)
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_token: address = self.steth_token
@@ -391,7 +408,11 @@ def submit(_amount: uint256, _terra_address: bytes32, _extra_data: Bytes[1024]) 
 
 
 @external
-def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
+def withdraw(
+    _amount: uint256,
+    _expected_version: uint256,
+    _recipient: address = msg.sender
+) -> uint256:
     """
     @dev Burns the `_amount` of provided Ethereum-side bETH tokens in return for stETH
          tokens transferred to the `_recipient` Ethereum address.
@@ -405,6 +426,7 @@ def withdraw(_amount: uint256, _recipient: address = msg.sender) -> uint256:
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
+    self._assert_version(_expected_version)
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_rate: uint256 = self._get_rate(True)

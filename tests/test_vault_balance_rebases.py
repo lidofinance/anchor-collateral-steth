@@ -12,7 +12,7 @@ def test_rate_changes(vault, lido_oracle_report, vault_user, liquidations_admin,
     assert vault.get_rate() == 10**18
 
     steth_token.approve(vault, 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     assert helpers.equal_with_precision(
         vault.get_rate(),
@@ -92,15 +92,15 @@ def test_beth_io_possible_after_steth_io(
     steth_token.approve(vault, 2 * 10**18, {'from': vault_user})
 
     assert vault.can_deposit_or_withdraw()
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     lido.submit(ZERO_ADDRESS, {'from': stranger, 'value': steth_io_amount})
 
     assert vault.can_deposit_or_withdraw()
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
-    vault.withdraw(10**18, {'from': vault_user})
+    vault.withdraw(10**18, vault.version(), {'from': vault_user})
 
 
 def test_beth_io_possible_after_non_rebasing_lido_oracle_report(
@@ -113,15 +113,15 @@ def test_beth_io_possible_after_non_rebasing_lido_oracle_report(
     steth_token.approve(vault, 2 * 10**18, {'from': vault_user})
 
     assert vault.can_deposit_or_withdraw()
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     lido_oracle_report(steth_rebase_mult=1.0)
 
     assert vault.can_deposit_or_withdraw()
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
-    vault.withdraw(10**18, {'from': vault_user})
+    vault.withdraw(10**18, vault.version(), {'from': vault_user})
 
 
 # FIXME: use vault instead of vault_no_proxy after brownie learns to parse
@@ -136,25 +136,25 @@ def test_beth_io_prohibited_between_positive_rebase_by_oracle_report_and_rewards
     withdraw_from_terra
 ):
     steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     lido_oracle_report(steth_rebase_mult = 1 + 0.04/365)
 
     assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
     vault_no_proxy.collect_rewards({'from': liquidations_admin})
     assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault_no_proxy.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
 
 # FIXME: use vault instead of vault_no_proxy after brownie learns to parse
@@ -169,25 +169,25 @@ def test_beth_io_prohibited_between_negative_rebase_by_oracle_report_and_rewards
     withdraw_from_terra
 ):
     steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     lido_oracle_report(steth_rebase_mult = 1 - 0.00000004/365)
 
     assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
     vault_no_proxy.collect_rewards({'from': liquidations_admin})
     assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault_no_proxy.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
 
 # FIXME: use vault instead of vault_no_proxy after brownie learns to parse
@@ -204,25 +204,25 @@ def test_beth_io_prohibited_between_rebase_by_burning_steth_and_rewards_sell(
     withdraw_from_terra
 ):
     steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     burn_steth(another_vault_user, 10**18)
 
     assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault_no_proxy.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
     vault_no_proxy.collect_rewards({'from': liquidations_admin})
     assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault_no_proxy.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', vault_no_proxy.version(), {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, vault_no_proxy.version(), {'from': vault_user})
 
 
 def test_steth_positive_rebase(
@@ -241,7 +241,7 @@ def test_steth_positive_rebase(
     adjusted_amount = steth_adjusted_ammount(amount)
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
     assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == amount
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
@@ -267,7 +267,7 @@ def test_steth_positive_rebase(
     )
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=stranger, amount=amount)
-    vault.withdraw(amount, {'from': stranger})
+    vault.withdraw(amount, vault.version(), {'from': stranger})
 
     assert helpers.equal_with_precision(steth_token.balanceOf(stranger), adjusted_amount, 100)
 
@@ -288,7 +288,7 @@ def test_steth_negative_rebase(
     adjusted_amount = steth_adjusted_ammount(amount)
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
     assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == amount
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
@@ -314,7 +314,7 @@ def test_steth_negative_rebase(
 
     assert helpers.equal_with_precision(vault.get_rate(), expected_withdraw_rate, 100)
 
-    vault.withdraw(amount, {'from': stranger})
+    vault.withdraw(amount, vault.version(), {'from': stranger})
 
     assert helpers.equal_with_precision(
         steth_token.balanceOf(stranger),
@@ -344,7 +344,7 @@ def test_steth_rewards_after_penalties(
     positive_rebase_multiplier = 1 / negative_rebase_multiplier
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
    
     lido_oracle_report(steth_rebase_mult=negative_rebase_multiplier)
 
@@ -362,7 +362,7 @@ def test_steth_rewards_after_penalties(
     })
 
     steth_token.approve(vault, amount, {'from': another_vault_user})
-    vault.submit(amount, ANOTHER_TERRA_ADDRESS, b'', {'from': another_vault_user})
+    vault.submit(amount, ANOTHER_TERRA_ADDRESS, b'', vault.version(), {'from': another_vault_user})
     
     lido_oracle_report(steth_rebase_mult=positive_rebase_multiplier)
     chain.mine(timedelta = 3600*24 + 1)
@@ -373,7 +373,7 @@ def test_steth_rewards_after_penalties(
         to_address=stranger, 
         amount=mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
     )
-    vault.withdraw(beth_token.balanceOf(stranger), {'from': stranger})
+    vault.withdraw(beth_token.balanceOf(stranger), vault.version(), {'from': stranger})
 
     assert helpers.equal_with_precision(
         steth_token.balanceOf(stranger),
@@ -386,7 +386,7 @@ def test_steth_rewards_after_penalties(
         to_address=another_stranger,
         amount=mock_bridge_connector.terra_beth_balance_of(ANOTHER_TERRA_ADDRESS)
     )
-    vault.withdraw(beth_token.balanceOf(another_stranger), {'from': another_stranger})
+    vault.withdraw(beth_token.balanceOf(another_stranger), vault.version(), {'from': another_stranger})
 
     assert helpers.equal_with_precision(
         steth_token.balanceOf(another_stranger),
@@ -477,7 +477,7 @@ def test_shares_balance_decrease_liquidation(
     vault.collect_rewards({'from': liquidations_admin})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=0.5 * 10**18)
-    vault.withdraw(0.5 * 10**18, {'from': vault_user})
+    vault.withdraw(0.5 * 10**18, vault.version(), {'from': vault_user})
     
     chain.mine(timedelta=3600*28)
 

@@ -325,7 +325,7 @@ def test_integrates_with_real_vault(
     adjusted_amount = steth_adjusted_ammount(amount)
 
     steth_token.approve(vault, amount, {"from": vault_user})
-    vault.submit(amount, TERRA_ADDRESS, b"", {"from": vault_user})
+    vault.submit(amount, TERRA_ADDRESS, b"", vault.version(), {"from": vault_user})
     assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == adjusted_amount
 
     lido_oracle_report(steth_rebase_mult=1.01)
