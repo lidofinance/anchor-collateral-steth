@@ -187,7 +187,7 @@ def check_vault(
 
         terra_recipient_1 = '0x0000000000000000000000008badf00d8badf00d8badf00d8badf00d8badf00d'
         steth_token.approve(vault, 2 * 10**18, {'from': holder_1})
-        tx = vault.submit(2 * 10**18, terra_recipient_1, b'', {'from': holder_1})
+        tx = vault.submit(2 * 10**18, terra_recipient_1, b'', vault.version(), {'from': holder_1})
         # tx.info()
 
         assert 'Deposited' in tx.events
@@ -230,7 +230,7 @@ def check_vault(
         beth_supply_before = beth_supply
 
         terra_recipient_2 = '0x000000000000000000000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-        tx = vault.submit(1 * 10**18, terra_recipient_2, b'', {'from': holder_2, 'value': 1 * 10**18})
+        tx = vault.submit(1 * 10**18, terra_recipient_2, b'', vault.version(), {'from': holder_2, 'value': 1 * 10**18})
         # tx.info()
 
         assert 'Deposited' in tx.events

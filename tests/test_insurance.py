@@ -38,7 +38,7 @@ def test_insurance_applied_before_rewards_collection_avoids_changing_rate(
     amount = steth_adjusted_ammount(10**18)
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
 
@@ -82,7 +82,7 @@ def test_insurance_is_not_counted_as_rewards(
     amount = steth_adjusted_ammount(10**18)
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    vault.submit(amount, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault.submit(amount, TERRA_ADDRESS, b'', vault.version(), {'from': vault_user})
 
     vault_steth_balance_before = steth_token.balanceOf(vault)
 

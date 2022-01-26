@@ -34,7 +34,7 @@ def test_anchor_vault_submit(
 
     steth_token.approve(vault, amount, {'from': vault_user})
 
-    tx = vault.submit(amount, TERRA_ADDRESS, '', {'from': vault_user})
+    tx = vault.submit(amount, TERRA_ADDRESS, '', vault.version(), {'from': vault_user})
 
     helpers.assert_single_event_named('WormholeTransfer', tx, source=mock_wormhole_token_bridge, evt_keys_dict={
         'token': BETH_TOKEN,

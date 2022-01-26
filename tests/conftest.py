@@ -233,7 +233,7 @@ def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_a
         steth_amount_adj = steth_adjusted_ammount(amount)
 
         steth_token.approve(vault, amount, {'from': sender})
-        tx = vault.submit(amount, terra_address, '0xab', {'from': sender})
+        tx = vault.submit(amount, terra_address, '0xab', vault.version(), {'from': sender})
 
         steth_balance_decrease = steth_balance_before - steth_token.balanceOf(sender)
         assert helpers.equal_with_precision(steth_balance_decrease, steth_amount_adj, max_diff=10**10)

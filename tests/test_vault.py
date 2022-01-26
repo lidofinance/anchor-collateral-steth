@@ -134,6 +134,7 @@ def test_initial_config_correct(
     liquidations_admin
 ):
     assert vault.admin() == admin
+    assert vault.version() == 1
     assert vault.beth_token() == beth_token
     assert vault.bridge_connector() == mock_bridge_connector
     assert vault.rewards_liquidator() == mock_rewards_liquidator
@@ -158,7 +159,7 @@ def test_deposit(
     terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
 
     steth_token.approve(vault, amount, {'from': vault_user})
-    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
     adjusted_amount = steth_adjusted_ammount(amount)
 
@@ -197,7 +198,7 @@ def test_deposit_eth(
     steth_balance_before = steth_token.balanceOf(vault_user)
     terra_balance_before = mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS)
 
-    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': amount})
+    tx = vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user, 'value': amount})
 
     deposited_amount = tx.events['Deposited']['amount']
     assert deposited_amount <= amount
@@ -232,13 +233,13 @@ def test_deposit_eth(
 # dev revert reasons from behind a proxy
 def test_deposit_eth_fails_on_unexpected_amount(vault_no_proxy, vault_user):
     with reverts('dev: unexpected ETH amount sent'):
-        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 - 1})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', vault_no_proxy.version(), {'from': vault_user, 'value': 10**18 - 1})
 
     with reverts('dev: unexpected ETH amount sent'):
-        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 + 1})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', vault_no_proxy.version(), {'from': vault_user, 'value': 10**18 + 1})
 
     with reverts('dev: unexpected ETH amount sent'):
-        vault_no_proxy.submit(0, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18})
+        vault_no_proxy.submit(0, TERRA_ADDRESS, '0xab', vault_no_proxy.version(), {'from': vault_user, 'value': 10**18})
 
 
 def test_withdraw(
@@ -264,7 +265,7 @@ def test_withdraw(
     assert beth_token.balanceOf(vault_user) == amount
     assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before - amount
 
-    tx = vault.withdraw(amount, {'from': vault_user})
+    tx = vault.withdraw(amount, vault.version(), {'from': vault_user})
 
     assert helpers.equal_with_precision(steth_token.balanceOf(vault_user), steth_balance_before, 10)
 
@@ -284,7 +285,7 @@ def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from
     withdraw_from_terra(TERRA_ADDRESS, vault_user, amount)
 
     with reverts():
-        vault.withdraw(amount + 1, {'from': vault_user})
+        vault.withdraw(amount + 1, vault.version(), {'from': vault_user})
 
 
 def test_change_admin(vault, stranger, admin, helpers):
@@ -396,7 +397,7 @@ def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, lido_orac
     assert vault.get_rate() == 10**18
 
     steth_token.approve(vault, 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
     steth_locked = steth_token.balanceOf(vault)
 
@@ -412,7 +413,7 @@ def test_rate_after_rebase(vault, steth_token, beth_token, vault_user, lido_orac
 
 def test_rate_after_direct_transfer(vault, steth_token, beth_token, vault_user, helpers):
     steth_token.approve(vault, 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user})
+    vault.submit(10**18, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
     assert helpers.equal_with_precision(vault.get_rate(), 10**18, max_diff=10)
 
