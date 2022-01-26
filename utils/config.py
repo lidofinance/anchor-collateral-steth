@@ -12,7 +12,7 @@ wormhole_token_bridge_addr = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
 
 # intergration addresses
 vault_proxy_addr = '0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf'
-vault_impl_addr = '0x0627054d17eAe63ec23C6d8b07d8Db7A66ffd45a'
+vault_impl_addr = '0x777CeE2a757bD958939d3Fbfd8af17AA5A34051D'
 beth_token_addr = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
 bridge_connector_addr = '0x2618e94a7F6118acED2E51e0a05da43D2e2eD40C'
 rewards_liquidator_addr = '0xE3c8A4De3b8A484ff890a38d6D7B5D278d697Fb7'
