@@ -12,8 +12,8 @@ MAX_USDC_UST_PRICE_DIFF_PERCENT = 3
 MAX_STETH_UST_PRICE_DIFF_PERCENT = 5
 
 CURVE_STETH_POOL = "0xDC24316b9AE028F1497c275EB9192a3Ea0f67022"
-CURVE_UST_POOL = "0x890f4e345B1dAED0367A877a1612f86A1f86985f"
-CURVE_USDC_POOL = "0xB0a0716841F2Fc03fbA72A891B8Bb13584F52F2d"
+CURVE_UST_POOL = "0xCEAF7747579696A2F0bb206a14210e3c9e6fB269"
+CURVE_DEPOSITOR = "0xA79828DF1850E8a3A3064576f380D90aECDD3359"
 CURVE_ETH_INDEX = 0
 CURVE_STETH_INDEX = 1
 CURVE_USDC_INDEX = 2
@@ -37,7 +37,7 @@ def whale(lido, accounts, ust_token, usdc_token):
     ust_token.mint(acct, ust_amount, {"from": ust_owner})
     assert ust_token.balanceOf(acct) == ust_amount
 
-    usdc_amount = 1_000_000_000 * 10 ** 6
+    usdc_amount = 10_000_000_000 * 10 ** 6
     usdc_masterMinter = accounts.at(usdc_token.masterMinter(), force=True)
     usdc_token.configureMinter(usdc_masterMinter, usdc_amount, {"from": usdc_masterMinter})
     print(usdc_token.minterAllowance(usdc_masterMinter))
@@ -243,12 +243,12 @@ def test_fails_on_excess_usdc_ust_price_change(
 
     feed_price = helpers.get_cross_price(helpers.get_price(feed_usdc_eth, False), helpers.get_price(feed_ust_eth, True))
     print("chainlink usdc->eth->ust price", feed_price)
-    liquidity_amount = 45_000_000 * 10 ** 6
-    usdc_pool = interface.CurveUSDC(CURVE_USDC_POOL)
-    usdc_token.approve(usdc_pool, liquidity_amount, {"from": whale})
-    usdc_pool.add_liquidity([0, 0, liquidity_amount, 0], 0, {"from": whale})
+    liquidity_amount = 5_000_000_000 * 10 ** 6
 
-    pool_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6) / 10 ** 18
+    depositor = interface.CurveDepositor(CURVE_DEPOSITOR)
+    usdc_token.approve(depositor, liquidity_amount, {"from": whale})
+    depositor.add_liquidity(ust_pool, [0, 0, liquidity_amount, 0], 0, {"from": whale})
+    pool_price = ust_pool.get_dy_underlying(CURVE_USDC_INDEX, CURVE_UST_INDEX, 10 ** 6) / 10 ** 6
     print("pool usdc->ust price", pool_price)
     assert feed_price * ((100 - MAX_USDC_UST_PRICE_DIFF_PERCENT) / 100) >= pool_price
 

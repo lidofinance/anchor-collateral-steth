@@ -9,7 +9,7 @@ event Test__Forwarded:
     extra_data: Bytes[1024]
 
 
-UST_TOKEN: constant(address) = 0xa47c8bf37f92aBed4A126BDA807A7b7498661acD
+UST_TOKEN: constant(address) = 0xa693B19d2931d498c5B318dF961919BB4aee87a5
 
 terra_beth_balances: HashMap[bytes32, uint256]
 

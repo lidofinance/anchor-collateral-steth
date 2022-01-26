@@ -1,7 +1,7 @@
 import pytest
 from brownie import reverts, chain, ZERO_ADDRESS
 
-from test_vault import vault, ANCHOR_REWARDS_DISTRIBUTOR
+from test_vault import vault, vault_no_proxy, ANCHOR_REWARDS_DISTRIBUTOR
 
 
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
@@ -124,71 +124,77 @@ def test_beth_io_possible_after_non_rebasing_lido_oracle_report(
     vault.withdraw(10**18, {'from': vault_user})
 
 
+# FIXME: use vault instead of vault_no_proxy after brownie learns to parse
+# dev revert reasons from behind a proxy
 def test_beth_io_prohibited_between_positive_rebase_by_oracle_report_and_rewards_sell(
     lido,
-    vault,
+    vault_no_proxy,
     vault_user,
     liquidations_admin,
     steth_token,
     lido_oracle_report,
     withdraw_from_terra
 ):
-    steth_token.approve(vault, 100 * 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     lido_oracle_report(steth_rebase_mult = 1 + 0.04/365)
 
-    assert not vault.can_deposit_or_withdraw()
+    assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
-    vault.collect_rewards({'from': liquidations_admin})
-    assert vault.can_deposit_or_withdraw()
+    vault_no_proxy.collect_rewards({'from': liquidations_admin})
+    assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
 
+# FIXME: use vault instead of vault_no_proxy after brownie learns to parse
+# dev revert reasons from behind a proxy
 def test_beth_io_prohibited_between_negative_rebase_by_oracle_report_and_rewards_sell(
     lido,
-    vault,
+    vault_no_proxy,
     vault_user,
     liquidations_admin,
     steth_token,
     lido_oracle_report,
     withdraw_from_terra
 ):
-    steth_token.approve(vault, 100 * 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     lido_oracle_report(steth_rebase_mult = 1 - 0.00000004/365)
 
-    assert not vault.can_deposit_or_withdraw()
+    assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
-    vault.collect_rewards({'from': liquidations_admin})
-    assert vault.can_deposit_or_withdraw()
+    vault_no_proxy.collect_rewards({'from': liquidations_admin})
+    assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
 
+# FIXME: use vault instead of vault_no_proxy after brownie learns to parse
+# dev revert reasons from behind a proxy
 def test_beth_io_prohibited_between_rebase_by_burning_steth_and_rewards_sell(
     lido,
-    vault,
+    vault_no_proxy,
     vault_user,
     another_vault_user,
     stranger,
@@ -197,26 +203,26 @@ def test_beth_io_prohibited_between_rebase_by_burning_steth_and_rewards_sell(
     burn_steth,
     withdraw_from_terra
 ):
-    steth_token.approve(vault, 100 * 10**18, {'from': vault_user})
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    steth_token.approve(vault_no_proxy, 100 * 10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     burn_steth(another_vault_user, 10**18)
 
-    assert not vault.can_deposit_or_withdraw()
+    assert not vault_no_proxy.can_deposit_or_withdraw()
 
     with reverts('dev: share price changed'):
-        vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
 
     withdraw_from_terra(TERRA_ADDRESS, to_address=vault_user, amount=10**18)
 
     with reverts('dev: share price changed'):
-        vault.withdraw(10**18, {'from': vault_user})
+        vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
-    vault.collect_rewards({'from': liquidations_admin})
-    assert vault.can_deposit_or_withdraw()
+    vault_no_proxy.collect_rewards({'from': liquidations_admin})
+    assert vault_no_proxy.can_deposit_or_withdraw()
 
-    vault.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
-    vault.withdraw(10**18, {'from': vault_user})
+    vault_no_proxy.submit(10**18, TERRA_ADDRESS, b'', {'from': vault_user})
+    vault_no_proxy.withdraw(10**18, {'from': vault_user})
 
 
 def test_steth_positive_rebase(

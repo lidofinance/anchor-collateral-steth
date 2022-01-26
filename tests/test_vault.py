@@ -91,6 +91,38 @@ def vault(
     return vault
 
 
+@pytest.fixture(scope='function')
+def vault_no_proxy(
+    beth_token,
+    steth_token,
+    mock_bridge_connector,
+    mock_rewards_liquidator,
+    mock_insurance_connector,
+    deployer,
+    admin,
+    liquidations_admin,
+    AnchorVault
+):
+    vault = AnchorVault.deploy({'from': deployer})
+
+    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+
+    vault.configure(
+        mock_bridge_connector,
+        mock_rewards_liquidator,
+        mock_insurance_connector,
+        liquidations_admin,
+        NO_LIQUIDATION_INTERVAL,
+        RESTRICTED_LIQUIDATION_INTERVAL,
+        ANCHOR_REWARDS_DISTRIBUTOR,
+        {'from': admin}
+    )
+
+    beth_token.set_minter(vault, {'from': admin})
+
+    return vault
+
+
 def test_initial_config_correct(
     vault,
     admin,
@@ -196,15 +228,17 @@ def test_deposit_eth(
     )
 
 
-def test_deposit_eth_fails_on_unexpected_amount(vault, vault_user):
+# FIXME: use vault instead of vault_no_proxy after brownie learns to parse
+# dev revert reasons from behind a proxy
+def test_deposit_eth_fails_on_unexpected_amount(vault_no_proxy, vault_user):
     with reverts('dev: unexpected ETH amount sent'):
-        vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 - 1})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 - 1})
 
     with reverts('dev: unexpected ETH amount sent'):
-        vault.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 + 1})
+        vault_no_proxy.submit(10**18, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18 + 1})
 
     with reverts('dev: unexpected ETH amount sent'):
-        vault.submit(0, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18})
+        vault_no_proxy.submit(0, TERRA_ADDRESS, '0xab', {'from': vault_user, 'value': 10**18})
 
 
 def test_withdraw(

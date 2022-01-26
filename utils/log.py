@@ -17,6 +17,7 @@ def ok(text, value = None):
 
     print(result)
 
+
 def nb(text, value = None):
     result = highlight('>>> ', color_yellow) + text
 
@@ -24,3 +25,14 @@ def nb(text, value = None):
         result += ': ' + highlight(value, color_hl)
 
     print(result)
+
+
+def h(text):
+    print()
+    nb(text)
+    print()
+
+
+def assert_equals(desc, actual, expected):
+    assert actual == expected, f"{desc}: expected {expected} bot got {actual}"
+    ok(desc, actual)
