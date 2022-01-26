@@ -118,8 +118,6 @@ def initialize(beth_token: address, steth_token: address, admin: address):
     assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
     assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
 
-    assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
-
     self.beth_token = beth_token
     self.steth_token = steth_token
     # we're explicitly allowing zero admin address for ossification
