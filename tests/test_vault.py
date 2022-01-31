@@ -12,6 +12,8 @@ NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
 # only admin can liquidate rewards for the first 2h after that
 RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
+VAULT_VERSION = 3
+
 
 def test_init_cannot_be_called_twice(beth_token, steth_token, deployer, admin, stranger, AnchorVault):
     vault = AnchorVault.deploy({'from': deployer})
@@ -54,6 +56,44 @@ def test_init_fails_on_non_zero_beth_total_supply(
         vault.initialize(beth_token, steth_token, admin, {'from': deployer})
 
 
+def test_initialized_vault_cannot_be_petrified(
+    beth_token,
+    steth_token,
+    deployer,
+    admin,
+    stranger,
+    AnchorVault
+):
+    vault = AnchorVault.deploy({'from': deployer})
+    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.petrify_impl({'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.petrify_impl({'from': deployer})
+
+    with reverts('dev: already initialized'):
+        vault.petrify_impl({'from': admin})
+
+
+def test_petrified_vault_cannot_be_initialized(
+    beth_token,
+    steth_token,
+    deployer,
+    stranger,
+    AnchorVault
+):
+    vault = AnchorVault.deploy({'from': deployer})
+    vault.petrify_impl({'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.initialize(beth_token, steth_token, stranger, {'from': stranger})
+
+    with reverts('dev: already initialized'):
+        vault.initialize(beth_token, steth_token, deployer, {'from': deployer})
+
+
 @pytest.fixture(scope='module')
 def vault(
     beth_token,
@@ -62,18 +102,38 @@ def vault(
     mock_rewards_liquidator,
     mock_insurance_connector,
     deployer,
+    stranger,
     admin,
     liquidations_admin,
     AnchorVault,
-    AnchorVaultProxy
+    AnchorVaultProxy,
+    helpers
 ):
     impl = AnchorVault.deploy({'from': deployer})
-    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
+    impl.petrify_impl({'from': stranger})
+
+    assert impl.admin() == ZERO_ADDRESS
+    assert impl.beth_token() == ZERO_ADDRESS
+    assert impl.steth_token() == ZERO_ADDRESS
+
+    with reverts('dev: already initialized'):
+        impl.initialize(beth_token, steth_token, stranger, {'from': stranger})
+
+    with reverts('dev: already initialized'):
+        impl.initialize(beth_token, steth_token, deployer, {'from': deployer})
 
     proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
     vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
-    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+    tx = vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+
+    helpers.assert_single_event_named('AdminChanged', tx, source=vault, evt_keys_dict={
+        'new_admin': admin
+    })
+
+    helpers.assert_single_event_named('VersionIncremented', tx, source=vault, evt_keys_dict={
+        'new_version': VAULT_VERSION
+    })
 
     vault.configure(
         mock_bridge_connector,
@@ -134,7 +194,7 @@ def test_initial_config_correct(
     liquidations_admin
 ):
     assert vault.admin() == admin
-    assert vault.version() == 1
+    assert vault.version() == VAULT_VERSION
     assert vault.beth_token() == beth_token
     assert vault.bridge_connector() == mock_bridge_connector
     assert vault.rewards_liquidator() == mock_rewards_liquidator
@@ -142,6 +202,36 @@ def test_initial_config_correct(
     assert vault.liquidations_admin() == liquidations_admin
     assert vault.no_liquidation_interval() == NO_LIQUIDATION_INTERVAL
     assert vault.restricted_liquidation_interval() == RESTRICTED_LIQUIDATION_INTERVAL
+
+
+def test_finalize_upgrade_v3_cannot_be_called_on_v3_vault(vault, admin):
+    with reverts('unexpected contract version'):
+        vault.finalize_upgrade_v3({'from': admin})
+
+
+def test_version_can_be_bumped_by_admin(vault, admin, helpers):
+    version = vault.version()
+    tx = vault.bump_version({'from': admin})
+    assert vault.version() == version + 1
+    helpers.assert_single_event_named('VersionIncremented', tx, source=vault, evt_keys_dict={
+        'new_version': version + 1
+    })
+
+
+# FIXME: use vault instead of vault_no_proxy after brownie learns to parse
+# dev revert reasons from behind a proxy
+def test_version_cannot_be_bumped_by_a_non_admin(vault_no_proxy, stranger, liquidations_admin):
+    with reverts('dev: unauthorized'):
+        vault_no_proxy.bump_version({'from': stranger})
+    with reverts('dev: unauthorized'):
+        vault_no_proxy.bump_version({'from': liquidations_admin})
+
+
+def test_finalize_upgrade_v3_cannot_be_called_on_v4_vault(vault, admin):
+    vault.bump_version({'from': admin})
+    assert vault.version() == 4
+    with reverts('unexpected contract version'):
+        vault.finalize_upgrade_v3({'from': admin})
 
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])

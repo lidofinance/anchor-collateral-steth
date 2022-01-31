@@ -73,6 +73,10 @@ event AnchorRewardsDistributorUpdated:
     anchor_rewards_distributor: bytes32
 
 
+event VersionIncremented:
+    new_version: uint256
+
+
 BETH_DECIMALS: constant(uint256) = 18
 
 # A constant used in `_can_deposit_or_withdraw` when comparing Lido share prices.
@@ -111,31 +115,67 @@ last_liquidation_time: public(uint256)
 last_liquidation_share_price: public(uint256)
 last_liquidation_shares_burnt: public(uint256)
 
+version: public(uint256)
+
+
+@internal
+def _assert_version(_expected_version: uint256):
+    assert _expected_version == self.version, "unexpected contract version"
+
+
+@internal
+def _assert_authorized(msg_sender: address):
+    assert msg_sender == self.admin # dev: unauthorized
+
+
+@internal
+def _initialize_v3():
+    self.version = 3
+    log VersionIncremented(3)
+
 
 @external
 def initialize(beth_token: address, steth_token: address, admin: address):
     assert self.beth_token == ZERO_ADDRESS # dev: already initialized
+    assert self.version == 0 # dev: already initialized
+
     assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
     assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
+
+    assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
 
     self.beth_token = beth_token
     self.steth_token = steth_token
     # we're explicitly allowing zero admin address for ossification
     self.admin = admin
     self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
+    self._initialize_v3()
 
     log AdminChanged(admin)
 
 
 @external
-@pure
-def version() -> uint256:
-    return 2
+def petrify_impl():
+    """
+    @dev Prevents initialization of an implementation sitting behind a proxy.
+    """
+    assert self.version == 0 # dev: already initialized
+    self.version = MAX_UINT256
 
 
-@internal
-def _assert_version(_expected_version: uint256):
-    assert _expected_version == 2 # dev: unexpected contract version
+@external
+def finalize_upgrade_v3():
+    """
+    @dev Performs state changes required for proxy upgrade from version 2 to version 3.
+
+    Can only be called by the current admin address.
+    """
+    self._assert_authorized(msg.sender)
+    # in v2, the version() function returned constant value of 2; in the upgraded impl,
+    # the same function reads a storage slot that's zero until this function is called
+    self._assert_version(0)
+    self._initialize_v3()
+
 
 
 @external
@@ -145,9 +185,26 @@ def change_admin(new_admin: address):
 
     Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
+    # we're explicitly allowing zero admin address for ossification
     self.admin = new_admin
     log AdminChanged(new_admin)
+
+
+@external
+def bump_version():
+    """
+    @dev Increments contract version. Can only be called by the current admin address.
+
+    Due to the usage of replaceable delegates, contract version cannot be compiled to
+    the AnchorVault implementation as a constant. Instead, the governance should call
+    this function when non-backwards-compatible changes are made to the contract or
+    its delegates.
+    """
+    self._assert_authorized(msg.sender)
+    new_version: uint256 = self.version + 1
+    self.version = new_version
+    log VersionIncremented(new_version)
 
 
 @internal
@@ -164,7 +221,7 @@ def set_bridge_connector(_bridge_connector: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_bridge_connector(_bridge_connector)
 
 
@@ -181,7 +238,7 @@ def set_rewards_liquidator(_rewards_liquidator: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_rewards_liquidator(_rewards_liquidator)
 
 
@@ -199,7 +256,7 @@ def set_insurance_connector(_insurance_connector: address):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_insurance_connector(_insurance_connector)
 
 
@@ -235,7 +292,7 @@ def set_liquidation_config(
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_liquidation_config(
         _liquidations_admin,
         _no_liquidation_interval,
@@ -257,7 +314,7 @@ def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
 
@@ -276,7 +333,7 @@ def configure(
 
     Can only be called by the current admin address.
     """
-    assert msg.sender == self.admin # dev: unauthorized
+    self._assert_authorized(msg.sender)
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
     self._set_insurance_connector(_insurance_connector)
