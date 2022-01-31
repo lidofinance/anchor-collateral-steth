@@ -8,18 +8,18 @@ interface SelfOwnedStETHBurner:
     def getCoverSharesBurnt() -> uint256: view
 
 
-self_owned_steth_burner: public(address)
+SELF_OWNDED_STETH_BURNER: immutable(address)
 
 
 @external
 def __init__(
-    self_owned_steth_burner: address
+    _self_owned_steth_burner: address
 ):
-    assert self_owned_steth_burner != ZERO_ADDRESS, "ZERO_BURNER_ADDRESS"
+    assert _self_owned_steth_burner != ZERO_ADDRESS, "ZERO_BURNER_ADDRESS"
 
-    self.self_owned_steth_burner = self_owned_steth_burner
+    SELF_OWNDED_STETH_BURNER = _self_owned_steth_burner
 
 @external
 @view
 def total_shares_burnt() -> uint256:
-    return SelfOwnedStETHBurner(self.self_owned_steth_burner).getCoverSharesBurnt()
+    return SelfOwnedStETHBurner(SELF_OWNDED_STETH_BURNER).getCoverSharesBurnt()
