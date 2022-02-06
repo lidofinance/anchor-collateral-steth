@@ -150,8 +150,8 @@ def _assert_version(_expected_version: uint256):
 
 
 @internal
-def _assert_authorized(msg_sender: address):
-    assert msg_sender == self.admin # dev: unauthorized
+def _assert_admin(addr: address):
+    assert addr == self.admin # dev: unauthorized
 
 
 @internal
@@ -197,7 +197,7 @@ def change_admin(new_admin: address):
 
     Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     # we're explicitly allowing zero admin address for ossification
     self.admin = new_admin
     log AdminChanged(new_admin)
@@ -213,7 +213,7 @@ def bump_version():
     this function when backwards-incompatible changes are made to the contract or its
     delegates.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     new_version: uint256 = self.version + 1
     self.version = new_version
     log VersionIncremented(new_version)
@@ -233,7 +233,7 @@ def set_bridge_connector(_bridge_connector: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_bridge_connector(_bridge_connector)
 
 
@@ -250,7 +250,7 @@ def set_rewards_liquidator(_rewards_liquidator: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_rewards_liquidator(_rewards_liquidator)
 
 
@@ -268,7 +268,7 @@ def set_insurance_connector(_insurance_connector: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_insurance_connector(_insurance_connector)
 
 
@@ -304,7 +304,7 @@ def set_liquidation_config(
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_liquidation_config(
         _liquidations_admin,
         _no_liquidation_interval,
@@ -326,7 +326,7 @@ def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
 
@@ -345,7 +345,7 @@ def configure(
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
     self._set_insurance_connector(_insurance_connector)
@@ -575,7 +575,7 @@ def finalize_upgrade_v3():
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     # in v2, the version() function returned constant value of 2; in the upgraded impl,
     # the same function reads a storage slot that's zero until this function is called
     self._assert_version(0)
