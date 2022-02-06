@@ -33,13 +33,13 @@ def beth_token(bEth):
     return bEth.at(beth_token_addr)
 
 
-def upgrade_vault_to_v3(vault_proxy, impl_deployer):
+def upgrade_vault_to_v3(vault_proxy, impl_deployer, emergency_admin):
     proxy_admin = accounts.at(vault_proxy.proxy_getAdmin(), force=True)
 
     new_impl = AnchorVault.deploy({'from': impl_deployer})
     new_impl.petrify_impl({'from': impl_deployer})
 
-    setup_calldata = new_impl.finalize_upgrade_v3.encode_input()
+    setup_calldata = new_impl.finalize_upgrade_v3.encode_input(emergency_admin)
     return vault_proxy.proxy_upgradeTo(new_impl, setup_calldata, {'from': proxy_admin})
 
 
@@ -221,9 +221,15 @@ def dictdiff(from_dict, to_dict):
   return result
 
 
-def test_upgrade_affects_only_expected_contract_fields(vault_proxy, steth_token, stranger, helpers):
+def test_upgrade_affects_only_expected_contract_fields(
+    vault_proxy,
+    steth_token,
+    emergency_admin,
+    stranger,
+    helpers
+):
     state_before = record_vault_state(as_vault_v2(vault_proxy), steth_token)
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     
     vault_v3 = as_vault_v3(vault_proxy)
     state_after = record_vault_state(vault_v3, steth_token)
@@ -246,7 +252,16 @@ def test_upgrade_affects_only_expected_contract_fields(vault_proxy, steth_token,
     assert vault_v3.total_beth_refunded() == REFUND_BETH_AMOUNT
 
 
-def test_rebases(vault_proxy, steth_token, stranger, another_stranger, lido_oracle_report, interface, helpers):
+def test_rebases(
+    vault_proxy,
+    steth_token,
+    stranger,
+    another_stranger,
+    emergency_admin,
+    lido_oracle_report,
+    interface,
+    helpers
+):
     vault = as_vault_v3(vault_proxy)
     beth_token = interface.ERC20(vault.beth_token())
     wormhole_token_bridge = Contract.from_abi(
@@ -272,7 +287,7 @@ def test_rebases(vault_proxy, steth_token, stranger, another_stranger, lido_orac
             lido_oracle_report
         )
 
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     
     with chain_snapshot():
         state_history_after = record_vault_state_history(

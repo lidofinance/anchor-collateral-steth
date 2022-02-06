@@ -26,6 +26,13 @@ def admin(accounts):
 
 
 @pytest.fixture(scope='module')
+def emergency_admin(accounts, deployer):
+    emergency_admin = accounts.add()
+    deployer.transfer(emergency_admin, 10 * 10**18)
+    return emergency_admin
+
+
+@pytest.fixture(scope='module')
 def liquidations_admin(accounts):
     return accounts[2]
 
@@ -69,6 +76,11 @@ def lido(interface, steth_token):
 
 
 @pytest.fixture(scope='module')
+def lido_dao_agent(accounts):
+    return accounts.at('0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c', force=True)
+
+
+@pytest.fixture(scope='module')
 def ust_token(interface):
     return interface.UST(UST_TOKEN)
 
@@ -77,17 +89,21 @@ def ust_token(interface):
 def usdc_token(interface):
     return interface.USDC(USDC_TOKEN)
 
+
 @pytest.fixture(scope='module')
 def feed_steth_eth(interface):
     return interface.Chainlink(CHAINLINK_STETH_ETH_FEED)
+
 
 @pytest.fixture(scope='module')
 def feed_usdc_eth(interface):
     return interface.Chainlink(CHAINLINK_USDC_ETH_FEED)
 
+
 @pytest.fixture(scope='module')
 def feed_ust_eth(interface):
     return interface.Chainlink(CHAINLINK_UST_ETH_FEED)
+
 
 @pytest.fixture(scope='module')
 def beth_token(deployer, admin, bEth):

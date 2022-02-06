@@ -60,24 +60,24 @@ def test_initialize_cannot_be_called_after_upgrading_impl(
     new_beth_token = bEth.deploy('bETH', ZERO_ADDRESS, stranger, {'from': stranger})
 
     with reverts():
-        vault.initialize(new_beth_token, steth_token, stranger, {'from': stranger})
+        vault.initialize(new_beth_token, steth_token, stranger, stranger, {'from': stranger})
 
     with reverts():
-        vault.initialize(new_beth_token, steth_token, vault_admin, {'from': vault_admin})
+        vault.initialize(new_beth_token, steth_token, vault_admin, vault_admin, {'from': vault_admin})
 
 
-def upgrade_vault_to_v3(vault_proxy, impl_deployer):
+def upgrade_vault_to_v3(vault_proxy, impl_deployer, emergency_admin):
     proxy_admin = accounts.at(vault_proxy.proxy_getAdmin(), force=True)
 
     new_impl = AnchorVault.deploy({'from': impl_deployer})
     new_impl.petrify_impl({'from': impl_deployer})
 
-    setup_calldata = new_impl.finalize_upgrade_v3.encode_input()
+    setup_calldata = new_impl.finalize_upgrade_v3.encode_input(emergency_admin)
     return vault_proxy.proxy_upgradeTo(new_impl, setup_calldata, {'from': proxy_admin})
 
 
-def test_upgrade_changes_version_to_3(vault_proxy, stranger, helpers):
-    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_upgrade_changes_version_to_3(vault_proxy, stranger, emergency_admin, helpers):
+    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     assert vault.version() == 3
@@ -87,26 +87,31 @@ def test_upgrade_changes_version_to_3(vault_proxy, stranger, helpers):
     })
 
 
-def test_finalize_upgrade_v3_cannot_be_called_twice(vault_proxy, stranger, vault_admin):
-    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_finalize_upgrade_v3_cannot_be_called_twice(vault_proxy, stranger, vault_admin, emergency_admin):
+    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3({'from': vault_admin})
+        vault.finalize_upgrade_v3(emergency_admin, {'from': vault_admin})
 
 
-def test_finalize_upgrade_v3_cannot_be_called_on_v4_vault(vault_proxy, stranger, vault_admin):
-    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_finalize_upgrade_v3_cannot_be_called_on_v4_vault(
+    vault_proxy,
+    stranger,
+    vault_admin,
+    emergency_admin
+):
+    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     vault.bump_version({'from': vault_admin})
     assert vault.version() == 4
 
     with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3({'from': vault_admin})
+        vault.finalize_upgrade_v3(emergency_admin, {'from': vault_admin})
 
 
-def test_upgrade_performs_the_refund(vault_proxy, steth_token, stranger, helpers):
+def test_upgrade_performs_the_refund(vault_proxy, steth_token, stranger, emergency_admin, helpers):
     vault = as_vault_v3(vault_proxy)
 
     vault_steth_balance_before = steth_token.balanceOf(vault_proxy)
@@ -114,7 +119,7 @@ def test_upgrade_performs_the_refund(vault_proxy, steth_token, stranger, helpers
     beth_rate_before = vault.get_rate()
     expected_refund_steth_amount = (REFUND_BETH_AMOUNT * 10**18) // beth_rate_before
 
-    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
 
     assert helpers.equal_with_precision(vault.get_rate(), beth_rate_before, 1)
     assert vault.total_beth_refunded() == REFUND_BETH_AMOUNT
@@ -132,19 +137,26 @@ def test_upgrade_performs_the_refund(vault_proxy, steth_token, stranger, helpers
     assert helpers.equal_with_precision(dao_steth_balance_change, -vault_steth_balance_change, 2)
 
 
-def test_cannot_finalize_upgrade_twice(vault_proxy, stranger, vault_admin):
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_cannot_finalize_upgrade_twice(vault_proxy, stranger, vault_admin, emergency_admin):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     with reverts():
-        vault.finalize_upgrade_v3({'from': vault_admin})
+        vault.finalize_upgrade_v3(emergency_admin, {'from': vault_admin})
 
     with reverts():
-        vault.finalize_upgrade_v3({'from': stranger})
+        vault.finalize_upgrade_v3(emergency_admin, {'from': stranger})
 
 
-def test_admin_can_burn_the_refunded_beth(vault_proxy, beth_token, stranger, vault_admin, helpers):
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_admin_can_burn_the_refunded_beth(
+    vault_proxy,
+    beth_token,
+    stranger,
+    vault_admin,
+    emergency_admin,
+    helpers
+):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     beth_total_supply_before = beth_token.totalSupply()
@@ -169,9 +181,10 @@ def test_admin_can_burn_the_refunded_beth_in_two_chunks(
     beth_token,
     stranger,
     vault_admin,
+    emergency_admin,
     helpers
 ):
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     beth_total_supply_before = beth_token.totalSupply()
@@ -204,8 +217,14 @@ def test_admin_can_burn_the_refunded_beth_in_two_chunks(
     })
 
 
-def test_cannot_burn_more_than_the_refunded_amount(vault_proxy, beth_token, stranger, vault_admin):
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_cannot_burn_more_than_the_refunded_amount(
+    vault_proxy,
+    beth_token,
+    stranger,
+    vault_admin,
+    emergency_admin
+):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     # simulate the unlock of the refunded bETH
@@ -223,8 +242,8 @@ def test_cannot_burn_more_than_the_refunded_amount(vault_proxy, beth_token, stra
         vault.burn_refunded_beth(REFUND_BETH_AMOUNT - beth_chunk_1 + 1, {'from': vault_admin})
 
 
-def test_non_admin_cannot_burn_the_refunded_beth(vault_proxy, beth_token, stranger):
-    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+def test_non_admin_cannot_burn_the_refunded_beth(vault_proxy, beth_token, stranger, emergency_admin):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
 
     # simulate the unlock of the refunded bETH
@@ -238,3 +257,6 @@ def test_non_admin_cannot_burn_the_refunded_beth(vault_proxy, beth_token, strang
 
     with reverts():
         vault.burn_refunded_beth(REFUND_BETH_AMOUNT, {'from': liquidations_admin})
+
+    with reverts():
+        vault.burn_refunded_beth(REFUND_BETH_AMOUNT, {'from': emergency_admin})

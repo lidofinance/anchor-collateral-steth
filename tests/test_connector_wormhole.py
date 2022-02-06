@@ -27,20 +27,22 @@ def vault(
     bridge_connector,
     mock_rewards_liquidator,
     mock_insurance_connector,
+    lido_dao_agent,
     deployer,
     admin,
     liquidations_admin,
+    emergency_admin,
     AnchorVault,
     AnchorVaultProxy
 ):
     impl = AnchorVault.deploy({'from': deployer})
-    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
+    impl.petrify_impl({'from': deployer})
 
     proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
 
     vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
-    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+    vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': deployer})
 
     vault.configure(
         bridge_connector,
@@ -54,6 +56,7 @@ def vault(
     )
 
     beth_token.set_minter(vault, {'from': admin})
+    vault.resume({'from': lido_dao_agent})
 
     return vault
 
