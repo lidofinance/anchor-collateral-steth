@@ -1,6 +1,8 @@
 import pytest
 from brownie import accounts, interface, Contract, AnchorVault, reverts, chain, ZERO_ADDRESS
 
+from utils.config import beth_token_addr, wormhole_token_bridge_addr
+
 """
 These tests should be ran on a mainnet block produced
 before the v3 upgrade, e.g. on the block 14158645.
@@ -33,6 +35,11 @@ def vault_proxy(AnchorVaultProxy):
     assert vault.version() == 2
     assert vault.admin() == proxy.proxy_getAdmin()
     return proxy
+
+
+@pytest.fixture(scope='module')
+def beth_token(bEth):
+    return bEth.at(beth_token_addr)
 
 
 def test_initialize_cannot_be_called_after_upgrading_impl(
@@ -134,3 +141,100 @@ def test_cannot_finalize_upgrade_twice(vault_proxy, stranger, vault_admin):
 
     with reverts():
         vault.finalize_upgrade_v3({'from': stranger})
+
+
+def test_admin_can_burn_the_refunded_beth(vault_proxy, beth_token, stranger, vault_admin, helpers):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    vault = as_vault_v3(vault_proxy)
+
+    beth_total_supply_before = beth_token.totalSupply()
+    beth_rate_before = vault.get_rate()
+
+    # simulate the unlock of the refunded bETH
+    token_bridge = accounts.at(wormhole_token_bridge_addr, force=True)
+    beth_token.transfer(vault, REFUND_BETH_AMOUNT, {'from': token_bridge})
+
+    tx = vault.burn_refunded_beth(REFUND_BETH_AMOUNT, {'from': vault_admin})
+
+    assert beth_token.totalSupply() == beth_total_supply_before - REFUND_BETH_AMOUNT
+    assert vault.get_rate() == beth_rate_before
+
+    helpers.assert_single_event_named('RefundedBethBurned', tx, source=vault, evt_keys_dict={
+        'beth_amount': REFUND_BETH_AMOUNT
+    })
+
+
+def test_admin_can_burn_the_refunded_beth_in_two_chunks(
+    vault_proxy,
+    beth_token,
+    stranger,
+    vault_admin,
+    helpers
+):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    vault = as_vault_v3(vault_proxy)
+
+    beth_total_supply_before = beth_token.totalSupply()
+    beth_rate_before = vault.get_rate()
+
+    beth_amount_unlock_1 = REFUND_BETH_AMOUNT // 3
+    beth_amount_unlock_2 = REFUND_BETH_AMOUNT - beth_amount_unlock_1
+
+    # simulate the unlock of the refunded bETH
+    token_bridge = accounts.at(wormhole_token_bridge_addr, force=True)
+
+    beth_token.transfer(vault, beth_amount_unlock_1, {'from': token_bridge})
+    tx_1 = vault.burn_refunded_beth(beth_amount_unlock_1, {'from': vault_admin})
+
+    assert beth_token.totalSupply() == beth_total_supply_before - beth_amount_unlock_1
+    assert vault.get_rate() == beth_rate_before
+
+    helpers.assert_single_event_named('RefundedBethBurned', tx_1, source=vault, evt_keys_dict={
+        'beth_amount': beth_amount_unlock_1
+    })
+
+    beth_token.transfer(vault, beth_amount_unlock_2, {'from': token_bridge})
+    tx_2 = vault.burn_refunded_beth(beth_amount_unlock_2, {'from': vault_admin})
+
+    assert beth_token.totalSupply() == beth_total_supply_before - REFUND_BETH_AMOUNT
+    assert vault.get_rate() == beth_rate_before
+
+    helpers.assert_single_event_named('RefundedBethBurned', tx_2, source=vault, evt_keys_dict={
+        'beth_amount': beth_amount_unlock_2
+    })
+
+
+def test_cannot_burn_more_than_the_refunded_amount(vault_proxy, beth_token, stranger, vault_admin):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    vault = as_vault_v3(vault_proxy)
+
+    # simulate the unlock of the refunded bETH
+    token_bridge = accounts.at(wormhole_token_bridge_addr, force=True)
+    beth_token.transfer(vault, REFUND_BETH_AMOUNT, {'from': token_bridge})
+
+    with reverts():
+        vault.burn_refunded_beth(REFUND_BETH_AMOUNT + 1, {'from': vault_admin})
+
+    beth_chunk_1 = REFUND_BETH_AMOUNT // 3
+
+    vault.burn_refunded_beth(beth_chunk_1, {'from': vault_admin})
+
+    with reverts():
+        vault.burn_refunded_beth(REFUND_BETH_AMOUNT - beth_chunk_1 + 1, {'from': vault_admin})
+
+
+def test_non_admin_cannot_burn_the_refunded_beth(vault_proxy, beth_token, stranger):
+    upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger)
+    vault = as_vault_v3(vault_proxy)
+
+    # simulate the unlock of the refunded bETH
+    token_bridge = accounts.at(wormhole_token_bridge_addr, force=True)
+    beth_token.transfer(vault, REFUND_BETH_AMOUNT, {'from': token_bridge})
+
+    liquidations_admin = accounts.at(vault.liquidations_admin(), force=True)
+
+    with reverts():
+        vault.burn_refunded_beth(REFUND_BETH_AMOUNT, {'from': stranger})
+
+    with reverts():
+        vault.burn_refunded_beth(REFUND_BETH_AMOUNT, {'from': liquidations_admin})

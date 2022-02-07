@@ -49,6 +49,10 @@ event Refunded:
     comment: String[1024]
 
 
+event RefundedBethBurned:
+    beth_amount: uint256
+
+
 event RewardsCollected:
     steth_amount: uint256
     ust_amount: uint256
@@ -522,18 +526,21 @@ def _withdraw_for_refunding_burned_beth(
     """
     @dev Withdraws stETH without burning the corresponding bETH, assuming that
          the corresponding bETH was already effectively burned, i.e. that it
-         cannot be moved from the address it currently belongs to by any actor
-         at any current or future moment. Returns the amount of stETH withdrawn.
+         cannot be moved from the address it currently belongs to. Returns
+         the amount of stETH withdrawn.
 
-    Can only be called by the current admin address. Used by the DAO governance
-    to refund bETH that is provably burned, e.g. by using an incorrect encoding
-    of the Terra recipient address. The governance takes the responsibility for
-    verifying the inaccessibility of the bETH being refunded.
+    Can be used by the DAO governance to refund bETH that became locked as the
+    result of a contract or user error, e.g. by using an incorrect encoding of
+    the Terra recipient address. The governance takes the responsibility for
+    verifying the immobility of the bETH being refunded and for taking all
+    required actions should the refunded bETH become movable again.
 
     The call fails if `AnchorVault.can_deposit_or_withdraw()` returns false.
 
     The same conversion rate from bETH to stETH as in the `withdraw` method
     is applied. The call doesn't change the conversion rate.
+
+    See: `withdraw`, `burn_refunded_beth`.
     """
     steth_rate: uint256 = self._get_rate(True)
     self.total_beth_refunded += _burned_beth_amount
@@ -542,6 +549,33 @@ def _withdraw_for_refunding_burned_beth(
     log Refunded(_recipient, _burned_beth_amount, steth_amount, _comment)
 
     return steth_amount
+
+
+@external
+def burn_refunded_beth(beth_amount: uint256):
+    """
+    @dev Burns bETH belonging to the AnchorVault contract address, assuming that
+         the corresponding stETH amount was already withdrawn from the vault
+         via the `_withdraw_for_refunding_burned_beth` method.
+
+    Can only be called by the current admin address.
+
+    Used by the governance to actually burn bETH that previously became locked as
+    the result of a contract or user error and was subsequently refunded.
+
+    Reverts unless at least the specified bETH amount was refunded and wasn't
+    burned yet.
+
+    See: `_withdraw_for_refunding_burned_beth`.
+    """
+    self._assert_admin(msg.sender)
+
+    # this will revert if beth_amount exceeds total_beth_refunded
+    self.total_beth_refunded -= beth_amount
+
+    Mintable(self.beth_token).burn(self, beth_amount)
+
+    log RefundedBethBurned(beth_amount)
 
 
 @internal
