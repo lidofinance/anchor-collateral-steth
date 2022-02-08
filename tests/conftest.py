@@ -10,10 +10,6 @@ CHAINLINK_STETH_ETH_FEED = "0x86392dC19c0b719886221c78AB11eb8Cf5c52812"
 CHAINLINK_UST_ETH_FEED = "0xa20623070413d42a5C01Db2c8111640DD7A5A03a"
 CHAINLINK_USDC_ETH_FEED = "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4"
 
-ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
-NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
-RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
-
 @pytest.fixture(scope='function', autouse=True)
 def shared_setup(fn_isolation):
     pass
@@ -96,43 +92,6 @@ def feed_ust_eth(interface):
 @pytest.fixture(scope='module')
 def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
-
-@pytest.fixture(scope='module')
-def vault(
-    beth_token,
-    steth_token,
-    bridge_connector,
-    mock_rewards_liquidator,
-    mock_insurance_connector,
-    deployer,
-    admin,
-    liquidations_admin,
-    AnchorVault,
-    AnchorVaultProxy
-):
-    impl = AnchorVault.deploy({'from': deployer})
-    impl.initialize(beth_token, steth_token, ZERO_ADDRESS, {'from': deployer})
-
-    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
-
-    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
-
-    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
-
-    vault.configure(
-        bridge_connector,
-        mock_rewards_liquidator,
-        mock_insurance_connector,
-        liquidations_admin,
-        NO_LIQUIDATION_INTERVAL,
-        RESTRICTED_LIQUIDATION_INTERVAL,
-        ANCHOR_REWARDS_DISTRIBUTOR,
-        {'from': admin}
-    )
-
-    beth_token.set_minter(vault, {'from': admin})
-
-    return vault
 
 
 @pytest.fixture(scope='module')
