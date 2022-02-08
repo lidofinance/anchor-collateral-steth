@@ -42,6 +42,17 @@ event Withdrawn:
     amount: uint256
 
 
+event Refunded:
+    recipient: indexed(address)
+    beth_amount: uint256
+    steth_amount: uint256
+    comment: String[1024]
+
+
+event RefundedBethBurned:
+    beth_amount: uint256
+
+
 event RewardsCollected:
     steth_amount: uint256
     ust_amount: uint256
@@ -134,6 +145,8 @@ last_liquidation_shares_burnt: public(uint256)
 #
 version: public(uint256)
 
+total_beth_refunded: public(uint256)
+
 
 @internal
 def _assert_version(_expected_version: uint256):
@@ -141,8 +154,8 @@ def _assert_version(_expected_version: uint256):
 
 
 @internal
-def _assert_authorized(msg_sender: address):
-    assert msg_sender == self.admin # dev: unauthorized
+def _assert_admin(addr: address):
+    assert addr == self.admin # dev: unauthorized
 
 
 @internal
@@ -180,20 +193,6 @@ def petrify_impl():
     self.version = MAX_UINT256
 
 
-@external
-def finalize_upgrade_v3():
-    """
-    @dev Performs state changes required for proxy upgrade from version 2 to version 3.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_authorized(msg.sender)
-    # in v2, the version() function returned constant value of 2; in the upgraded impl,
-    # the same function reads a storage slot that's zero until this function is called
-    self._assert_version(0)
-    self._initialize_v3()
-
-
 
 @external
 def change_admin(new_admin: address):
@@ -202,7 +201,7 @@ def change_admin(new_admin: address):
 
     Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     # we're explicitly allowing zero admin address for ossification
     self.admin = new_admin
     log AdminChanged(new_admin)
@@ -218,7 +217,7 @@ def bump_version():
     this function when backwards-incompatible changes are made to the contract or its
     delegates.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     new_version: uint256 = self.version + 1
     self.version = new_version
     log VersionIncremented(new_version)
@@ -238,7 +237,7 @@ def set_bridge_connector(_bridge_connector: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_bridge_connector(_bridge_connector)
 
 
@@ -255,7 +254,7 @@ def set_rewards_liquidator(_rewards_liquidator: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_rewards_liquidator(_rewards_liquidator)
 
 
@@ -273,7 +272,7 @@ def set_insurance_connector(_insurance_connector: address):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_insurance_connector(_insurance_connector)
 
 
@@ -309,7 +308,7 @@ def set_liquidation_config(
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_liquidation_config(
         _liquidations_admin,
         _no_liquidation_interval,
@@ -331,7 +330,7 @@ def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
 
 
@@ -350,7 +349,7 @@ def configure(
 
     Can only be called by the current admin address.
     """
-    self._assert_authorized(msg.sender)
+    self._assert_admin(msg.sender)
     self._set_bridge_connector(_bridge_connector)
     self._set_rewards_liquidator(_rewards_liquidator)
     self._set_insurance_connector(_insurance_connector)
@@ -366,7 +365,7 @@ def configure(
 @view
 def _get_rate(_is_withdraw_rate: bool) -> uint256:
     steth_balance: uint256 = ERC20(self.steth_token).balanceOf(self)
-    beth_supply: uint256 = ERC20(self.beth_token).totalSupply()
+    beth_supply: uint256 = ERC20(self.beth_token).totalSupply() - self.total_beth_refunded
     if steth_balance >= beth_supply:
         return 10**18
     elif _is_withdraw_rate:
@@ -479,37 +478,143 @@ def submit(
     return (steth_amount_adj, beth_amount)
 
 
+@internal
+def _withdraw(recipient: address, beth_amount: uint256, steth_rate: uint256) -> uint256:
+    assert self._can_deposit_or_withdraw() # dev: share price changed
+    steth_amount: uint256 = (beth_amount * steth_rate) / 10**18
+    ERC20(self.steth_token).transfer(recipient, steth_amount)
+    return steth_amount
+
+
+
 @external
 def withdraw(
-    _amount: uint256,
+    _beth_amount: uint256,
     _expected_version: uint256,
     _recipient: address = msg.sender
 ) -> uint256:
     """
-    @dev Burns the `_amount` of provided Ethereum-side bETH tokens in return for stETH
+    @dev Burns the `_beth_amount` of provided Ethereum-side bETH tokens in return for stETH
          tokens transferred to the `_recipient` Ethereum address.
 
     To withdraw Terra-side bETH, you should firstly transfer the tokens to the Ethereum
     blockchain.
 
-    The call fails if `AnchorVault.can_deposit_or_withdraw()` is false.
+    The call fails if `AnchorVault.can_deposit_or_withdraw()` returns false.
 
     The conversion rate from stETH to bETH should normally be 1 but might be different after
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
     self._assert_version(_expected_version)
-    assert self._can_deposit_or_withdraw() # dev: share price changed
 
     steth_rate: uint256 = self._get_rate(True)
-    steth_amount: uint256 = (_amount * steth_rate) / 10**18
+    Mintable(self.beth_token).burn(msg.sender, _beth_amount)
+    steth_amount: uint256 = self._withdraw(_recipient, _beth_amount, steth_rate)
 
-    Mintable(self.beth_token).burn(msg.sender, _amount)
-    ERC20(self.steth_token).transfer(_recipient, steth_amount)
-
-    log Withdrawn(_recipient, _amount)
+    log Withdrawn(_recipient, _beth_amount)
 
     return steth_amount
+
+
+@internal
+def _withdraw_for_refunding_burned_beth(
+    _burned_beth_amount: uint256,
+    _recipient: address,
+    _comment: String[1024]
+) -> uint256:
+    """
+    @dev Withdraws stETH without burning the corresponding bETH, assuming that
+         the corresponding bETH was already effectively burned, i.e. that it
+         cannot be moved from the address it currently belongs to. Returns
+         the amount of stETH withdrawn.
+
+    Can be used by the DAO governance to refund bETH that became locked as the
+    result of a contract or user error, e.g. by using an incorrect encoding of
+    the Terra recipient address. The governance takes the responsibility for
+    verifying the immobility of the bETH being refunded and for taking all
+    required actions should the refunded bETH become movable again.
+
+    The call fails if `AnchorVault.can_deposit_or_withdraw()` returns false.
+
+    The same conversion rate from bETH to stETH as in the `withdraw` method
+    is applied. The call doesn't change the conversion rate.
+
+    See: `withdraw`, `burn_refunded_beth`.
+    """
+    steth_rate: uint256 = self._get_rate(True)
+    self.total_beth_refunded += _burned_beth_amount
+    steth_amount: uint256 = self._withdraw(_recipient, _burned_beth_amount, steth_rate)
+
+    log Refunded(_recipient, _burned_beth_amount, steth_amount, _comment)
+
+    return steth_amount
+
+
+@external
+def burn_refunded_beth(beth_amount: uint256):
+    """
+    @dev Burns bETH belonging to the AnchorVault contract address, assuming that
+         the corresponding stETH amount was already withdrawn from the vault
+         via the `_withdraw_for_refunding_burned_beth` method.
+
+    Can only be called by the current admin address.
+
+    Used by the governance to actually burn bETH that previously became locked as
+    the result of a contract or user error and was subsequently refunded.
+
+    Reverts unless at least the specified bETH amount was refunded and wasn't
+    burned yet.
+
+    See: `_withdraw_for_refunding_burned_beth`.
+    """
+    self._assert_admin(msg.sender)
+
+    # this will revert if beth_amount exceeds total_beth_refunded
+    self.total_beth_refunded -= beth_amount
+
+    Mintable(self.beth_token).burn(self, beth_amount)
+
+    log RefundedBethBurned(beth_amount)
+
+
+@internal
+def _perform_refund_for_2022_01_26_incident():
+    """
+    @dev Withdraws stETH corresponding to bETH irreversibly locked at inaccessible Terra
+         addresses as the result of the 2022-01-26 incident caused by incorrect address
+         encoding produced by cached UI code after onchain migration to the Wormhole bridge.
+
+    Tx 1: 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d
+    bETH burned: 4449999990000000000
+
+    Tx 2: 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951
+    bETH burned: 439111118580000000000
+    """
+    # prevent this funciton from being called after the v3 upgrade (see `finalize_upgrade_v3`)
+    self._assert_version(0)
+    LIDO_DAO_FINANCE_MULTISIG: address = 0x48F300bD3C52c7dA6aAbDE4B683dEB27d38B9ABb
+    BETH_AMOUNT_BURNED: uint256 = 4449999990000000000 + 439111118580000000000
+    self._withdraw_for_refunding_burned_beth(
+        BETH_AMOUNT_BURNED,
+        LIDO_DAO_FINANCE_MULTISIG,
+        "refund for 2022-01-26 incident, txid 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951 and 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d"
+    )
+
+
+@external
+def finalize_upgrade_v3():
+    """
+    @dev Performs state changes required for proxy upgrade from version 2 to version 3.
+
+    Can only be called by the current admin address.
+    """
+    self._assert_admin(msg.sender)
+    # in v2, the version() function returned constant value of 2; in the upgraded impl,
+    # the same function reads a storage slot that's zero until this function is called
+    self._assert_version(0)
+    self._perform_refund_for_2022_01_26_incident()
+    self._initialize_v3()
 
 
 @external
