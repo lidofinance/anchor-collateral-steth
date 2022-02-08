@@ -87,6 +87,12 @@ def test_upgrade_changes_version_to_3(vault_proxy, stranger, emergency_admin, he
     })
 
 
+def test_upgrade_doesnt_stop_the_contract(vault_proxy, stranger, emergency_admin, helpers):
+    tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
+    vault = as_vault_v3(vault_proxy)
+    assert vault.operations_allowed()
+
+
 def test_finalize_upgrade_v3_cannot_be_called_twice(vault_proxy, stranger, vault_admin, emergency_admin):
     tx = upgrade_vault_to_v3(vault_proxy, impl_deployer=stranger, emergency_admin=emergency_admin)
     vault = as_vault_v3(vault_proxy)
