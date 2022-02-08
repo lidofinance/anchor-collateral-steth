@@ -18,26 +18,26 @@ VAULT_VERSION = 3
 def test_init_cannot_be_called_twice(beth_token, steth_token, deployer, admin, stranger, AnchorVault):
     vault = AnchorVault.deploy({'from': deployer})
 
-    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+    vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+        vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+        vault.initialize(beth_token, steth_token, admin, admin, {'from': deployer})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, {'from': admin})
+        vault.initialize(beth_token, steth_token, admin, admin, {'from': admin})
 
 
 def test_init_fails_on_zero_token_address(beth_token, steth_token, deployer, admin, AnchorVault):
     vault = AnchorVault.deploy({'from': deployer})
 
     with reverts('dev: invalid bETH address'):
-        vault.initialize(ZERO_ADDRESS, steth_token, admin, {'from': deployer})
+        vault.initialize(ZERO_ADDRESS, steth_token, admin, admin, {'from': deployer})
 
     with reverts('dev: invalid stETH address'):
-        vault.initialize(beth_token, ZERO_ADDRESS, admin, {'from': deployer})
+        vault.initialize(beth_token, ZERO_ADDRESS, admin, admin, {'from': deployer})
 
 
 def test_init_fails_on_non_zero_beth_total_supply(
@@ -53,7 +53,7 @@ def test_init_fails_on_non_zero_beth_total_supply(
     vault = AnchorVault.deploy({'from': deployer})
 
     with reverts('dev: non-zero bETH total supply'):
-        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+        vault.initialize(beth_token, steth_token, admin, admin, {'from': deployer})
 
 
 def test_initialized_vault_cannot_be_petrified(
@@ -65,7 +65,7 @@ def test_initialized_vault_cannot_be_petrified(
     AnchorVault
 ):
     vault = AnchorVault.deploy({'from': deployer})
-    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+    vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
         vault.petrify_impl({'from': stranger})
@@ -88,14 +88,13 @@ def test_petrified_vault_cannot_be_initialized(
     vault.petrify_impl({'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, stranger, {'from': stranger})
+        vault.initialize(beth_token, steth_token, stranger, stranger, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, deployer, {'from': deployer})
+        vault.initialize(beth_token, steth_token, deployer, deployer, {'from': deployer})
 
 
-@pytest.fixture(scope='module')
-def vault(
+def deploy_and_initialize_vault(
     beth_token,
     steth_token,
     mock_bridge_connector,
@@ -104,7 +103,9 @@ def vault(
     deployer,
     stranger,
     admin,
+    emergency_admin,
     liquidations_admin,
+    lido_dao_agent,
     AnchorVault,
     AnchorVaultProxy,
     helpers
@@ -117,18 +118,22 @@ def vault(
     assert impl.steth_token() == ZERO_ADDRESS
 
     with reverts('dev: already initialized'):
-        impl.initialize(beth_token, steth_token, stranger, {'from': stranger})
+        impl.initialize(beth_token, steth_token, stranger, stranger, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        impl.initialize(beth_token, steth_token, deployer, {'from': deployer})
+        impl.initialize(beth_token, steth_token, deployer, deployer, {'from': deployer})
 
     proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
     vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
-    tx = vault.initialize(beth_token, steth_token, admin, {'from': stranger})
+    tx = vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': stranger})
 
     helpers.assert_single_event_named('AdminChanged', tx, source=vault, evt_keys_dict={
         'new_admin': admin
+    })
+
+    helpers.assert_single_event_named('EmergencyAdminChanged', tx, source=vault, evt_keys_dict={
+        'new_emergency_admin': emergency_admin
     })
 
     helpers.assert_single_event_named('VersionIncremented', tx, source=vault, evt_keys_dict={
@@ -151,6 +156,36 @@ def vault(
     return vault
 
 
+def resume_vault(vault, lido_dao_agent):
+    assert not vault.operations_allowed()
+    vault.resume({'from': lido_dao_agent})
+    assert vault.operations_allowed()
+    return vault
+
+
+
+@pytest.fixture(scope='module')
+def vault(
+    beth_token,
+    steth_token,
+    mock_bridge_connector,
+    mock_rewards_liquidator,
+    mock_insurance_connector,
+    deployer,
+    stranger,
+    admin,
+    emergency_admin,
+    liquidations_admin,
+    lido_dao_agent,
+    AnchorVault,
+    AnchorVaultProxy,
+    helpers
+):
+    vault = deploy_and_initialize_vault(**locals())
+    resume_vault(vault, lido_dao_agent)
+    return vault
+
+
 @pytest.fixture(scope='function')
 def vault_no_proxy(
     beth_token,
@@ -160,12 +195,14 @@ def vault_no_proxy(
     mock_insurance_connector,
     deployer,
     admin,
+    emergency_admin,
     liquidations_admin,
+    lido_dao_agent,
     AnchorVault
 ):
     vault = AnchorVault.deploy({'from': deployer})
 
-    vault.initialize(beth_token, steth_token, admin, {'from': deployer})
+    vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': deployer})
 
     vault.configure(
         mock_bridge_connector,
@@ -179,6 +216,7 @@ def vault_no_proxy(
     )
 
     beth_token.set_minter(vault, {'from': admin})
+    resume_vault(vault, lido_dao_agent)
 
     return vault
 
@@ -186,6 +224,7 @@ def vault_no_proxy(
 def test_initial_config_correct(
     vault,
     admin,
+    emergency_admin,
     beth_token,
     lido,
     mock_bridge_connector,
@@ -194,6 +233,7 @@ def test_initial_config_correct(
     liquidations_admin
 ):
     assert vault.admin() == admin
+    assert vault.emergency_admin() == emergency_admin
     assert vault.version() == VAULT_VERSION
     assert vault.beth_token() == beth_token
     assert vault.bridge_connector() == mock_bridge_connector
@@ -206,7 +246,7 @@ def test_initial_config_correct(
 
 def test_finalize_upgrade_v3_cannot_be_called_on_v3_vault(vault, admin):
     with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3({'from': admin})
+        vault.finalize_upgrade_v3(admin, {'from': admin})
 
 
 def test_version_can_be_bumped_by_admin(vault, admin, helpers):
@@ -220,18 +260,25 @@ def test_version_can_be_bumped_by_admin(vault, admin, helpers):
 
 # FIXME: use vault instead of vault_no_proxy after brownie learns to parse
 # dev revert reasons from behind a proxy
-def test_version_cannot_be_bumped_by_a_non_admin(vault_no_proxy, stranger, liquidations_admin):
+def test_version_cannot_be_bumped_by_a_non_admin(
+    vault_no_proxy,
+    stranger,
+    liquidations_admin,
+    emergency_admin
+):
     with reverts('dev: unauthorized'):
         vault_no_proxy.bump_version({'from': stranger})
     with reverts('dev: unauthorized'):
         vault_no_proxy.bump_version({'from': liquidations_admin})
+    with reverts('dev: unauthorized'):
+        vault_no_proxy.bump_version({'from': emergency_admin})
 
 
 def test_finalize_upgrade_v3_cannot_be_called_on_v4_vault(vault, admin):
     vault.bump_version({'from': admin})
     assert vault.version() == 4
     with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3({'from': admin})
+        vault.finalize_upgrade_v3(admin, {'from': admin})
 
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
@@ -252,12 +299,13 @@ def test_deposit(
     tx = vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
     adjusted_amount = steth_adjusted_ammount(amount)
+    expected_beth_amount = adjusted_amount
 
-    helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
-        'sender': vault_user,
-        'amount': adjusted_amount,
-        'terra_address': TERRA_ADDRESS
-    })
+    evt = helpers.assert_single_event_named('Deposited', tx, source=vault)
+    assert evt['sender'] == vault_user
+    assert evt['amount'] == adjusted_amount
+    assert evt['terra_address'] == TERRA_ADDRESS
+    assert helpers.equal_with_precision(evt['beth_amount_received'], expected_beth_amount, 500)
 
     helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
         'asset_name': 'bETH',
@@ -268,7 +316,7 @@ def test_deposit(
 
     assert beth_token.balanceOf(vault_user) == 0
 
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + adjusted_amount
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + expected_beth_amount
 
     steth_balance_decrease = steth_balance_before - steth_token.balanceOf(vault_user)
     assert helpers.equal_with_precision(steth_balance_decrease, adjusted_amount, max_diff=1)
@@ -292,12 +340,13 @@ def test_deposit_eth(
 
     deposited_amount = tx.events['Deposited']['amount']
     assert deposited_amount <= amount
+    expected_beth_amount = deposited_amount
 
-    helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
-        'sender': vault_user,
-        'amount': deposited_amount,
-        'terra_address': TERRA_ADDRESS
-    })
+    evt = helpers.assert_single_event_named('Deposited', tx, source=vault)
+    assert evt['sender'] == vault_user
+    assert evt['amount'] == deposited_amount
+    assert evt['terra_address'] == TERRA_ADDRESS
+    assert helpers.equal_with_precision(evt['beth_amount_received'], expected_beth_amount, 500)
 
     helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
         'asset_name': 'bETH',
@@ -307,7 +356,7 @@ def test_deposit_eth(
     })
 
     assert beth_token.balanceOf(vault_user) == 0
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + deposited_amount
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + expected_beth_amount
 
     steth_balance_increase = steth_token.balanceOf(vault_user) - steth_balance_before
     assert steth_balance_increase >= 0
@@ -359,10 +408,10 @@ def test_withdraw(
 
     assert helpers.equal_with_precision(steth_token.balanceOf(vault_user), steth_balance_before, 10)
 
-    helpers.assert_single_event_named('Withdrawn', tx, source=vault, evt_keys_dict={
-        'recipient': vault_user,
-        'amount': amount
-    })
+    evt = helpers.assert_single_event_named('Withdrawn', tx, source=vault)
+    assert evt['recipient'] == vault_user
+    assert evt['amount'] == amount
+    assert helpers.equal_with_precision(evt['steth_amount_received'], amount, 10)
 
 
 def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from_terra, deposit_to_terra):

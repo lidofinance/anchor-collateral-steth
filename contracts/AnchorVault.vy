@@ -35,11 +35,13 @@ event Deposited:
     sender: indexed(address)
     amount: uint256
     terra_address: bytes32
+    beth_amount_received: uint256
 
 
 event Withdrawn:
     recipient: indexed(address)
     amount: uint256
+    steth_amount_received: uint256
 
 
 event Refunded:
@@ -60,6 +62,10 @@ event RewardsCollected:
 
 event AdminChanged:
     new_admin: address
+
+
+event EmergencyAdminChanged:
+    new_emergency_admin: address
 
 
 event BridgeConnectorUpdated:
@@ -88,6 +94,14 @@ event VersionIncremented:
     new_version: uint256
 
 
+event OperationsStopped:
+    pass
+
+
+event OperationsResumed:
+    pass
+
+
 BETH_DECIMALS: constant(uint256) = 18
 
 # A constant used in `_can_deposit_or_withdraw` when comparing Lido share prices.
@@ -104,6 +118,9 @@ BETH_DECIMALS: constant(uint256) = 18
 # https://github.com/lidofinance/lido-dao/blob/eb33eb8/contracts/0.4.24/StETH.sol#L288
 #
 STETH_SHARE_PRICE_MAX_ERROR: constant(uint256) = 10
+
+# Aragon Agent contract of the Lido DAO
+LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
 
 # WARNING: since this contract is behind a proxy, don't change the order of the variables
 # and don't remove variables during the code upgrades. You can only append new variables
@@ -145,6 +162,9 @@ last_liquidation_shares_burnt: public(uint256)
 #
 version: public(uint256)
 
+emergency_admin: public(address)
+operations_allowed: public(bool)
+
 total_beth_refunded: public(uint256)
 
 
@@ -154,18 +174,30 @@ def _assert_version(_expected_version: uint256):
 
 
 @internal
+def _assert_not_stopped():
+    assert self.operations_allowed, "contract stopped"
+
+
+@internal
 def _assert_admin(addr: address):
     assert addr == self.admin # dev: unauthorized
 
 
 @internal
-def _initialize_v3():
+def _assert_dao_governance(addr: address):
+    assert addr == LIDO_DAO_AGENT # dev: unauthorized
+
+
+@internal
+def _initialize_v3(emergency_admin: address):
+    self.emergency_admin = emergency_admin
+    log EmergencyAdminChanged(emergency_admin)
     self.version = 3
     log VersionIncremented(3)
 
 
 @external
-def initialize(beth_token: address, steth_token: address, admin: address):
+def initialize(beth_token: address, steth_token: address, admin: address, emergency_admin: address):
     assert self.beth_token == ZERO_ADDRESS # dev: already initialized
     assert self.version == 0 # dev: already initialized
 
@@ -179,7 +211,7 @@ def initialize(beth_token: address, steth_token: address, admin: address):
     # we're explicitly allowing zero admin address for ossification
     self.admin = admin
     self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
-    self._initialize_v3()
+    self._initialize_v3(emergency_admin)
 
     log AdminChanged(admin)
 
@@ -193,6 +225,39 @@ def petrify_impl():
     self.version = MAX_UINT256
 
 
+@external
+def emergency_stop():
+    """
+    @dev Performs emergency stop of the contract. Can only be called
+    by the current emergency admin or by the current admin.
+
+    While contract is in the stopped state, the following functions revert:
+
+    * `submit`
+    * `withdraw`
+    * `collect_rewards`
+
+    See `resume`, `set_emergency_admin`.
+    """
+    assert msg.sender == self.emergency_admin or msg.sender == self.admin # dev: unauthorized
+    self._assert_not_stopped()
+    self.operations_allowed = False
+    log OperationsStopped()
+
+
+@external
+def resume():
+    """
+    @dev Resumes normal operations of the contract. Can only be called
+    by the Lido DAO governance contract.
+
+    See `emergency_stop`.
+    """
+    self._assert_dao_governance(msg.sender)
+    assert not self.operations_allowed # dev: not stopped
+    self.operations_allowed = True
+    log OperationsResumed()
+
 
 @external
 def change_admin(new_admin: address):
@@ -205,6 +270,21 @@ def change_admin(new_admin: address):
     # we're explicitly allowing zero admin address for ossification
     self.admin = new_admin
     log AdminChanged(new_admin)
+
+
+@external
+def set_emergency_admin(new_emergency_admin: address):
+    """
+    @dev Sets the address allowed to perform an emergency stop and having no other privileges.
+
+    Can only be called by the Lido DAO governance contract.
+
+    See `emergency_stop`, `resume`.
+    """
+    self._assert_dao_governance(msg.sender)
+    # we're explicitly allowing zero address
+    self.emergency_admin = new_emergency_admin
+    log EmergencyAdminChanged(new_emergency_admin)
 
 
 @external
@@ -417,7 +497,7 @@ def can_deposit_or_withdraw() -> bool:
     UST yet. Normally, this period should not last more than a couple of minutes
     each 24h.
     """
-    return self._can_deposit_or_withdraw()
+    return self.operations_allowed and self._can_deposit_or_withdraw()
 
 
 @external
@@ -444,6 +524,7 @@ def submit(
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
+    self._assert_not_stopped()
     self._assert_version(_expected_version)
     assert self._can_deposit_or_withdraw() # dev: share price changed
 
@@ -473,7 +554,7 @@ def submit(
     Mintable(self.beth_token).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
 
-    log Deposited(msg.sender, steth_amount_adj, _terra_address)
+    log Deposited(msg.sender, steth_amount_adj, _terra_address, beth_amount)
 
     return (steth_amount_adj, beth_amount)
 
@@ -506,13 +587,14 @@ def withdraw(
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
+    self._assert_not_stopped()
     self._assert_version(_expected_version)
 
     steth_rate: uint256 = self._get_rate(True)
     Mintable(self.beth_token).burn(msg.sender, _beth_amount)
     steth_amount: uint256 = self._withdraw(_recipient, _beth_amount, steth_rate)
 
-    log Withdrawn(_recipient, _beth_amount)
+    log Withdrawn(_recipient, _beth_amount, steth_amount)
 
     return steth_amount
 
@@ -603,7 +685,7 @@ def _perform_refund_for_2022_01_26_incident():
 
 
 @external
-def finalize_upgrade_v3():
+def finalize_upgrade_v3(emergency_admin: address):
     """
     @dev Performs state changes required for proxy upgrade from version 2 to version 3.
 
@@ -614,7 +696,8 @@ def finalize_upgrade_v3():
     # the same function reads a storage slot that's zero until this function is called
     self._assert_version(0)
     self._perform_refund_for_2022_01_26_incident()
-    self._initialize_v3()
+    self._initialize_v3(emergency_admin)
+    self.operations_allowed = True
 
 
 @external
@@ -623,6 +706,8 @@ def collect_rewards() -> uint256:
     @dev Sells stETH rewards and transfers them to the distributor contract in the
          Terra blockchain.
     """
+    self._assert_not_stopped()
+
     time_since_last_liquidation: uint256 = block.timestamp - self.last_liquidation_time
 
     if msg.sender == self.liquidations_admin:
