@@ -9,7 +9,7 @@ ANOTHER_TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcde
 
 
 @pytest.fixture(scope='module')
-def apply_insurance(lido, steth_burner, deployer, mock_insurance_connector):
+def apply_insurance(lido, steth_burner, deployer, mock_self_owned_steth_burner):
     def apply(steth_rebase_mult):
         # steth_in_share = total_eth / total_shares
         # mult * total_eth / total_shares = total_eth / (total_shares - shares_burnt)
@@ -20,7 +20,7 @@ def apply_insurance(lido, steth_burner, deployer, mock_insurance_connector):
         print(f'steth_to_burn: {steth_to_burn}')
         lido.submit(ZERO_ADDRESS, {'from': deployer, 'value': steth_to_burn + 100})
         lido.burnShares(deployer, shares_to_burn, {'from': steth_burner})
-        mock_insurance_connector.increment_total_shares_burnt(shares_to_burn)
+        mock_self_owned_steth_burner.increment_total_shares_burnt(shares_to_burn)
     return apply
 
 
