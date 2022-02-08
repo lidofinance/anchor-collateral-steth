@@ -115,6 +115,23 @@ last_liquidation_time: public(uint256)
 last_liquidation_share_price: public(uint256)
 last_liquidation_shares_burnt: public(uint256)
 
+# The contract version. Used to mark backwards-incompatible changes to the contract
+# logic, including installing delegates with an incompatible API. Can be changed both
+# in `_initialize_vX` after implementation code changes and by calling `bump_version`
+# after installing a new delegate.
+#
+# The following functions revert unless the value of the `_expected_version` argument
+# matches the one stored in this state variable:
+#
+# * `deposit`
+# * `withdraw`
+#
+# It's recommended for any external code interacting with this contract, both onchain
+# and offchain, to have the current version set as a configurable parameter to make
+# sure any incompatible change to the contract logic won't produce unexpected results,
+# reverting the transactions instead until the compatibility is manually checked and
+# the configured version is updated.
+#
 version: public(uint256)
 
 
@@ -198,8 +215,8 @@ def bump_version():
 
     Due to the usage of replaceable delegates, contract version cannot be compiled to
     the AnchorVault implementation as a constant. Instead, the governance should call
-    this function when non-backwards-compatible changes are made to the contract or
-    its delegates.
+    this function when backwards-incompatible changes are made to the contract or its
+    delegates.
     """
     self._assert_authorized(msg.sender)
     new_version: uint256 = self.version + 1
