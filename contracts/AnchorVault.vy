@@ -35,11 +35,13 @@ event Deposited:
     sender: indexed(address)
     amount: uint256
     terra_address: bytes32
+    beth_amount_received: uint256
 
 
 event Withdrawn:
     recipient: indexed(address)
     amount: uint256
+    steth_amount_received: uint256
 
 
 event Refunded:
@@ -552,7 +554,7 @@ def submit(
     Mintable(self.beth_token).mint(connector, beth_amount)
     BridgeConnector(connector).forward_beth(_terra_address, beth_amount, _extra_data)
 
-    log Deposited(msg.sender, steth_amount_adj, _terra_address)
+    log Deposited(msg.sender, steth_amount_adj, _terra_address, beth_amount)
 
     return (steth_amount_adj, beth_amount)
 
@@ -592,7 +594,7 @@ def withdraw(
     Mintable(self.beth_token).burn(msg.sender, _beth_amount)
     steth_amount: uint256 = self._withdraw(_recipient, _beth_amount, steth_rate)
 
-    log Withdrawn(_recipient, _beth_amount)
+    log Withdrawn(_recipient, _beth_amount, steth_amount)
 
     return steth_amount
 

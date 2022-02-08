@@ -299,12 +299,13 @@ def test_deposit(
     tx = vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
     adjusted_amount = steth_adjusted_ammount(amount)
+    expected_beth_amount = adjusted_amount
 
-    helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
-        'sender': vault_user,
-        'amount': adjusted_amount,
-        'terra_address': TERRA_ADDRESS
-    })
+    evt = helpers.assert_single_event_named('Deposited', tx, source=vault)
+    assert evt['sender'] == vault_user
+    assert evt['amount'] == adjusted_amount
+    assert evt['terra_address'] == TERRA_ADDRESS
+    assert helpers.equal_with_precision(evt['beth_amount_received'], expected_beth_amount, 500)
 
     helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
         'asset_name': 'bETH',
@@ -315,7 +316,7 @@ def test_deposit(
 
     assert beth_token.balanceOf(vault_user) == 0
 
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + adjusted_amount
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + expected_beth_amount
 
     steth_balance_decrease = steth_balance_before - steth_token.balanceOf(vault_user)
     assert helpers.equal_with_precision(steth_balance_decrease, adjusted_amount, max_diff=1)
@@ -339,12 +340,13 @@ def test_deposit_eth(
 
     deposited_amount = tx.events['Deposited']['amount']
     assert deposited_amount <= amount
+    expected_beth_amount = deposited_amount
 
-    helpers.assert_single_event_named('Deposited', tx, source=vault, evt_keys_dict={
-        'sender': vault_user,
-        'amount': deposited_amount,
-        'terra_address': TERRA_ADDRESS
-    })
+    evt = helpers.assert_single_event_named('Deposited', tx, source=vault)
+    assert evt['sender'] == vault_user
+    assert evt['amount'] == deposited_amount
+    assert evt['terra_address'] == TERRA_ADDRESS
+    assert helpers.equal_with_precision(evt['beth_amount_received'], expected_beth_amount, 500)
 
     helpers.assert_single_event_named('Test__Forwarded', tx, source=mock_bridge_connector, evt_keys_dict={
         'asset_name': 'bETH',
@@ -354,7 +356,7 @@ def test_deposit_eth(
     })
 
     assert beth_token.balanceOf(vault_user) == 0
-    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + deposited_amount
+    assert mock_bridge_connector.terra_beth_balance_of(TERRA_ADDRESS) == terra_balance_before + expected_beth_amount
 
     steth_balance_increase = steth_token.balanceOf(vault_user) - steth_balance_before
     assert steth_balance_increase >= 0
@@ -406,10 +408,10 @@ def test_withdraw(
 
     assert helpers.equal_with_precision(steth_token.balanceOf(vault_user), steth_balance_before, 10)
 
-    helpers.assert_single_event_named('Withdrawn', tx, source=vault, evt_keys_dict={
-        'recipient': vault_user,
-        'amount': amount
-    })
+    evt = helpers.assert_single_event_named('Withdrawn', tx, source=vault)
+    assert evt['recipient'] == vault_user
+    assert evt['amount'] == amount
+    assert helpers.equal_with_precision(evt['steth_amount_received'], amount, 10)
 
 
 def test_withdraw_fails_on_balance(vault, vault_user, steth_token, withdraw_from_terra, deposit_to_terra):
