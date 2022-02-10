@@ -16,4 +16,4 @@ networks:
       evm_version: istanbul
       mnemonic: 'rib diamond horse main tenant habit nothing fish alarm budget age comic filter execute used'
       # fork: http://localhost:9545@14042429
-      fork: https://mainnet.infura.io/v3/_your_api_key_@14042429
+      fork: https://mainnet.infura.io/v3/${WEB3_INFURA_PROJECT_ID}@14042429
