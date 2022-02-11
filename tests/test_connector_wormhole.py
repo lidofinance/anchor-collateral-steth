@@ -1,9 +1,13 @@
 import pytest
-from brownie import ZERO_ADDRESS, reverts, Wei, AnchorVault
+from brownie import Contract, ZERO_ADDRESS, reverts, Wei, AnchorVault
 
 TERRA_CHAIN_ID = 3
 TERRA_ADDRESS = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd'
 BETH_TOKEN = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
+
+ANCHOR_REWARDS_DISTRIBUTOR = '0x1234123412341234123412341234123412341234123412341234123412341234'
+NO_LIQUIDATION_INTERVAL = 60 * 60 * 24
+RESTRICTED_LIQUIDATION_INTERVAL = NO_LIQUIDATION_INTERVAL + 60 * 60 * 2
 
 @pytest.fixture(scope='module')
 def bridge_connector(
@@ -15,6 +19,46 @@ def bridge_connector(
         mock_wormhole_token_bridge,
         {'from': deployer}
     )
+
+@pytest.fixture(scope='module')
+def vault(
+    beth_token,
+    steth_token,
+    bridge_connector,
+    mock_rewards_liquidator,
+    mock_insurance_connector,
+    lido_dao_agent,
+    deployer,
+    admin,
+    liquidations_admin,
+    emergency_admin,
+    AnchorVault,
+    AnchorVaultProxy
+):
+    impl = AnchorVault.deploy({'from': deployer})
+    impl.petrify_impl({'from': deployer})
+
+    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
+
+    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
+
+    vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': deployer})
+
+    vault.configure(
+        bridge_connector,
+        mock_rewards_liquidator,
+        mock_insurance_connector,
+        liquidations_admin,
+        NO_LIQUIDATION_INTERVAL,
+        RESTRICTED_LIQUIDATION_INTERVAL,
+        ANCHOR_REWARDS_DISTRIBUTOR,
+        {'from': admin}
+    )
+
+    beth_token.set_minter(vault, {'from': admin})
+    vault.resume({'from': lido_dao_agent})
+
+    return vault
 
 def test_bridge_connector_wormhole_requires_non_zero_address(
     deployer,
