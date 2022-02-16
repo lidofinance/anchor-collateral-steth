@@ -7,6 +7,7 @@ from brownie import network, accounts
 ust_token_addr = '0xa693B19d2931d498c5B318dF961919BB4aee87a5'
 steth_token_addr = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'
 lido_dao_voting_addr = '0x2e59A20f205bB85a89C53f1936454680651E618e'
+lido_dao_agent_addr = '0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c'
 wormhole_addr = '0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B'
 wormhole_token_bridge_addr = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
 
