@@ -8,6 +8,7 @@ ust_token_addr = '0xa693B19d2931d498c5B318dF961919BB4aee87a5'
 steth_token_addr = '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84'
 lido_dao_voting_addr = '0x2e59A20f205bB85a89C53f1936454680651E618e'
 lido_dao_agent_addr = '0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c'
+selfowned_steth_burner_addr = '0x1e0C8542A59c286e73c30c45612d9C3a674A6cbC'
 wormhole_addr = '0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B'
 wormhole_token_bridge_addr = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
 
@@ -17,7 +18,7 @@ vault_impl_addr = '0x07BE9BB2B1789b8F5B2f9345F18378A8B036A171'
 beth_token_addr = '0x707F9118e33A9B8998beA41dd0d46f38bb963FC8'
 bridge_connector_addr = '0x2618e94a7F6118acED2E51e0a05da43D2e2eD40C'
 rewards_liquidator_addr = '0xE3c8A4De3b8A484ff890a38d6D7B5D278d697Fb7'
-insurance_connector_addr = '0x2BDfD3De0fF23373B621CDAD0aD3dF1580efE701'
+insurance_connector_addr = '0x714E3BcddBdC2045Bd3BE35c8642885470b25b11'
 dev_multisig_addr = '0x3cd9F71F80AB08ea5a7Dca348B5e94BC595f26A0'
 vault_liquidations_admin_addr = '0x1A9967A7b0c3dd39962296E53F5cf56471385dF2'
 
@@ -68,4 +69,3 @@ def prompt_bool():
         return False
 
     sys.stdout.write("Please respond with 'yes' or 'no'")
-

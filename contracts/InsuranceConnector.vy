@@ -23,3 +23,8 @@ def __init__(
 @view
 def total_shares_burnt() -> uint256:
     return SelfOwnedStETHBurner(SELF_OWNDED_STETH_BURNER).getCoverSharesBurnt()
+
+@external
+@view
+def get_self_owned_steth_burner() -> address:
+    return SELF_OWNDED_STETH_BURNER

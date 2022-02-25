@@ -149,3 +149,13 @@ def _sell_steth_balance(recipient):
     min_return = ust_amount * (1 - self.max_slippage_percent / 100)
     return self._swap_to_ust(steth_amount, recipient, min_return)
 ```
+
+### InsuranceConnector
+
+A smart contract that takes into account stETH shares burnt for the coverage application purposes.
+
+Provides the following interface:
+
+* `total_shares_burnt() -> uint256` gets the total ever burnt stETH shares amount (not token amount) for the coverage application purposes.
+
+See also: https://github.com/lidofinance/lido-improvement-proposals/blob/develop/LIPS/lip-6.md
