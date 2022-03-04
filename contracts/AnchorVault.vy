@@ -151,7 +151,7 @@ last_liquidation_shares_burnt: public(uint256)
 # The following functions revert unless the value of the `_expected_version` argument
 # matches the one stored in this state variable:
 #
-# * `deposit`
+# * `submit`
 # * `withdraw`
 #
 # It's recommended for any external code interacting with this contract, both onchain
@@ -463,7 +463,7 @@ def get_rate() -> uint256:
     @dev How much bETH one receives for depositing one stETH, and how much bETH one needs
          to provide to withdraw one stETH, 10**18 being the 1:1 rate.
 
-    This rate is notmally 10**18 (1:1) but might be different after severe penalties inflicted
+    This rate is normally 10**18 (1:1) but might be different after severe penalties inflicted
     on the Lido validators.
     """
     return self._get_rate(False)
