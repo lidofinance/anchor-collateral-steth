@@ -244,11 +244,6 @@ def test_initial_config_correct(
     assert vault.restricted_liquidation_interval() == RESTRICTED_LIQUIDATION_INTERVAL
 
 
-def test_finalize_upgrade_v3_cannot_be_called_on_v3_vault(vault, admin):
-    with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3(admin, {'from': admin})
-
-
 def test_version_can_be_bumped_by_admin(vault, admin, helpers):
     version = vault.version()
     tx = vault.bump_version({'from': admin})
@@ -272,13 +267,6 @@ def test_version_cannot_be_bumped_by_a_non_admin(
         vault_no_proxy.bump_version({'from': liquidations_admin})
     with reverts('dev: unauthorized'):
         vault_no_proxy.bump_version({'from': emergency_admin})
-
-
-def test_finalize_upgrade_v3_cannot_be_called_on_v4_vault(vault, admin):
-    vault.bump_version({'from': admin})
-    assert vault.version() == 4
-    with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v3(admin, {'from': admin})
 
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
