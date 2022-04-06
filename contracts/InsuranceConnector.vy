@@ -22,7 +22,7 @@ def __init__(
 @external
 @view
 def total_shares_burnt() -> uint256:
-    return SelfOwnedStETHBurner(SELF_OWNDED_STETH_BURNER).getCoverSharesBurnt()
+    return 0
 
 @external
 @view

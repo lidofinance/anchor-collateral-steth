@@ -109,7 +109,7 @@ BETH_DECIMALS: constant(uint256) = 18
 STETH_SHARE_PRICE_MAX_ERROR: constant(uint256) = 10
 
 # Aragon Agent contract of the Lido DAO
-LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
+LIDO_DAO_AGENT: constant(address) = 0x02139137FdD974181a49268D7b0AE888634E5469
 
 # WARNING: since this contract is behind a proxy, don't change the order of the variables
 # and don't remove variables during the code upgrades. You can only append new variables
@@ -186,7 +186,7 @@ def initialize(beth_token: address, steth_token: address, admin: address, emerge
     assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
     assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
 
-    assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
+    # assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
 
     self.beth_token = beth_token
     self.steth_token = steth_token

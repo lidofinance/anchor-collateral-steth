@@ -3,8 +3,8 @@
 # @licence MIT
 from vyper.interfaces import ERC20
 
-BETH_TOKEN: constant(address) = 0x707F9118e33A9B8998beA41dd0d46f38bb963FC8
-UST_WRAPPER_TOKEN: constant(address) = 0xa693B19d2931d498c5B318dF961919BB4aee87a5
+BETH_TOKEN: constant(address) = 0xA60100d5e12E9F83c1B04997314cf11685A618fF
+UST_WRAPPER_TOKEN: constant(address) = 0x6cA13a4ab78dd7D657226b155873A04DB929A3A4
 
 TERRA_CHAIN_ID: constant(uint256) = 3
 
