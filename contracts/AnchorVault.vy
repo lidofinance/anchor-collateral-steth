@@ -481,8 +481,7 @@ def _diff_abs(new: uint256, old: uint256) -> uint256:
 @view
 @internal
 def _can_deposit_or_withdraw() -> bool:
-    share_price: uint256 = Lido(self.steth_token).getPooledEthByShares(10**18)
-    return self._diff_abs(share_price, self.last_liquidation_share_price) <= STETH_SHARE_PRICE_MAX_ERROR
+    return True
 
 
 @view
@@ -554,7 +553,6 @@ def withdraw(
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
-    self._assert_not_stopped()
     self._assert_version(_expected_version)
 
     steth_rate: uint256 = self._get_rate(True)
