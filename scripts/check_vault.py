@@ -25,7 +25,9 @@ def main():
         rewards_liquidator_addr=c.rewards_liquidator_addr,
         insurance_connector_addr=c.insurance_connector_addr,
         terra_rewards_distributor_addr=c.terra_rewards_distributor_addr,
-        vault_admin=c.dev_multisig_addr,
+        # vault_admin=c.dev_multisig_addr,
+        vault_admin=c.lido_dao_agent_address,
+        rewards_liquidator_admin=c.dev_multisig_addr,
         vault_liquidations_admin=c.vault_liquidations_admin_addr,
         rew_liq_max_steth_eth_price_difference_percent=c.rew_liq_max_steth_eth_price_difference_percent,
         rew_liq_max_eth_usdc_price_difference_percent=c.rew_liq_max_eth_usdc_price_difference_percent,
@@ -43,6 +45,7 @@ def check_vault(
     insurance_connector_addr,
     terra_rewards_distributor_addr,
     vault_admin,
+    rewards_liquidator_admin,
     vault_liquidations_admin,
     rew_liq_max_steth_eth_price_difference_percent,
     rew_liq_max_eth_usdc_price_difference_percent,
@@ -120,7 +123,7 @@ def check_vault(
     print()
 
     log.ok('RewardsLiquidator', rewards_liquidator.address)
-    assert_equals('  admin', rewards_liquidator.admin(), vault_admin)
+    assert_equals('  admin', rewards_liquidator.admin(), rewards_liquidator_admin)
     assert_equals('  vault', rewards_liquidator.vault(), vault_proxy.address)
     assert_equals('  max_steth_eth_price_difference_percent',
         rewards_liquidator.max_steth_eth_price_difference_percent(),
@@ -314,4 +317,4 @@ def lido_oracle_report(steth_rebase_percent):
     total_supply = lido.totalSupply()
     beacon_balance += int(total_supply * steth_rebase_percent / 100)
     assert beacon_balance > 0
-    lido.pushBeacon(beacon_validators, beacon_balance, {'from': lido_oracle})
+    lido.handleOracleReport(beacon_validators, beacon_balance, {'from': lido_oracle})

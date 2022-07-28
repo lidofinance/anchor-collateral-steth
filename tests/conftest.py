@@ -1,5 +1,12 @@
 import pytest
-from brownie import ZERO_ADDRESS, Contract
+from brownie import ZERO_ADDRESS, chain
+
+from scripts.deploy_v4 import deploy_and_start_dao_vote
+
+from utils.config import (
+    ldo_vote_executors_for_tests,
+    lido_dao_voting_addr
+)
 
 
 BETH_DECIMALS = 18
@@ -168,7 +175,7 @@ def lido_oracle_report(interface, accounts, steth_token):
         total_supply_inc = (steth_rebase_mult - 1) * total_supply
         beacon_balance += total_supply_inc
         assert beacon_balance > 0
-        lido.pushBeacon(beacon_validators, beacon_balance, {'from': lido_oracle})
+        lido.handleOracleReport(beacon_validators, beacon_balance, {'from': lido_oracle})
     return report_beacon_state
 
 
@@ -225,8 +232,18 @@ def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_a
         return tx
     return deposit
 
+@pytest.fixture(scope='module')
+def ldo_holder(accounts):
+    return accounts.at('0xAD4f7415407B83a081A0Bee22D05A8FDC18B42da', force=True)
+
+@pytest.fixture(scope='module')
+def dao_voting(interface):
+    return interface.Voting(lido_dao_voting_addr)
 
 class Helpers:
+    accounts = None
+    dao_voting = None
+
     @staticmethod
     def filter_events_from(addr, events):
         return list(filter(lambda evt: evt.address == addr, events))
@@ -263,8 +280,47 @@ class Helpers:
     def get_cross_price(priceA, priceB):
         return (priceA * priceB)
 
+    @staticmethod
+    def pass_and_exec_dao_vote(vote_id):
+        print(f'executing vote {vote_id}')
+
+        # together these accounts hold 15% of LDO total supply
+        # ldo_vote_executors_for_tests
+
+        helper_acct = Helpers.accounts[0]
+
+        for holder_addr in ldo_vote_executors_for_tests:
+            print(f'voting from {holder_addr}')
+            helper_acct.transfer(holder_addr, '0.1 ether')
+            account = Helpers.accounts.at(holder_addr, force=True)
+            Helpers.dao_voting.vote(vote_id, True, False, {'from': account})
+
+        # wait for the vote to end
+        chain.sleep(3 * 60 * 60 * 24)
+        chain.mine()
+
+        assert Helpers.dao_voting.canExecute(vote_id)
+        Helpers.dao_voting.executeVote(vote_id, {'from': helper_acct})
+
+        print(f'vote {vote_id} executed')
+
 
 
 @pytest.fixture(scope='module')
-def helpers():
+def helpers(accounts, dao_voting):
+    Helpers.accounts = accounts
+    Helpers.dao_voting = dao_voting
     return Helpers
+
+@pytest.fixture(scope='module')
+def deploy_vault_and_pass_dao_vote(ldo_holder, helpers):
+    def deploy():
+        (vault, vote_id) = deploy_and_start_dao_vote(
+            {'from': ldo_holder}
+        )
+
+        helpers.pass_and_exec_dao_vote(vote_id)
+
+        return vault
+
+    return deploy
