@@ -39,12 +39,16 @@ def main():
 
     tx_params = {"from": deployer, "max_fee": "100 gwei", "priority_fee": "2 gwei"}
 
-    (vault_address, vote_id) = deploy_and_start_dao_vote(
-        tx_params
-    )
+    anchor_new_vault = deploy(tx_params)
 
-    print("Vault impl", vault_address)
-    print("Vote id", vote_id)
+    print("Vault impl", anchor_new_vault)
+    
+    # (vault_address, vote_id) = deploy_and_start_dao_vote(
+    #     tx_params
+    # )
+
+    # print("Vault impl", vault_address)
+    # print("Vote id", vote_id)
 
 
 

@@ -187,13 +187,10 @@ def _assert_admin(addr: address):
 def _assert_dao_governance(addr: address):
     assert addr == LIDO_DAO_AGENT # dev: unauthorized
 
-
 @internal
-def _initialize_v3(emergency_admin: address):
-    self.emergency_admin = emergency_admin
-    log EmergencyAdminChanged(emergency_admin)
-    self.version = 3
-    log VersionIncremented(3)
+def _initialize_v4():
+    self.version = 4
+    log VersionIncremented(4)
 
 
 @external
@@ -211,7 +208,14 @@ def initialize(beth_token: address, steth_token: address, admin: address, emerge
     # we're explicitly allowing zero admin address for ossification
     self.admin = admin
     self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
-    self._initialize_v3(emergency_admin)
+
+    ## version 3
+    self.emergency_admin = emergency_admin
+    log EmergencyAdminChanged(emergency_admin)
+    self.version = 3
+    log VersionIncremented(3)
+
+    self._initialize_v4()
 
     log AdminChanged(admin)
 
@@ -468,22 +472,6 @@ def get_rate() -> uint256:
     """
     return self._get_rate(False)
 
-
-@pure
-@internal
-def _diff_abs(new: uint256, old: uint256) -> uint256:
-    if new > old :
-        return new - old
-    else:
-        return old - new
-
-
-@view
-@internal
-def _can_deposit_or_withdraw() -> bool:
-    return True
-
-
 @view
 @external
 def can_deposit_or_withdraw() -> bool:
@@ -496,7 +484,7 @@ def can_deposit_or_withdraw() -> bool:
     UST yet. Normally, this period should not last more than a couple of minutes
     each 24h.
     """
-    return self.operations_allowed and self._can_deposit_or_withdraw()
+    return self.operations_allowed
 
 
 @external
@@ -527,7 +515,6 @@ def submit(
 
 @internal
 def _withdraw(recipient: address, beth_amount: uint256, steth_rate: uint256) -> uint256:
-    assert self._can_deposit_or_withdraw() # dev: share price changed
     steth_amount: uint256 = (beth_amount * steth_rate) / 10**18
     ERC20(self.steth_token).transfer(recipient, steth_amount)
     return steth_amount
@@ -553,6 +540,7 @@ def withdraw(
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
     rate by calling `AnchorVault.get_rate()`.
     """
+    self._assert_not_stopped()
     self._assert_version(_expected_version)
 
     steth_rate: uint256 = self._get_rate(True)
@@ -563,47 +551,11 @@ def withdraw(
 
     return steth_amount
 
-
-@internal
-def _withdraw_for_refunding_burned_beth(
-    _burned_beth_amount: uint256,
-    _recipient: address,
-    _comment: String[1024]
-) -> uint256:
-    """
-    @dev Withdraws stETH without burning the corresponding bETH, assuming that
-         the corresponding bETH was already effectively burned, i.e. that it
-         cannot be moved from the address it currently belongs to. Returns
-         the amount of stETH withdrawn.
-
-    Can be used by the DAO governance to refund bETH that became locked as the
-    result of a contract or user error, e.g. by using an incorrect encoding of
-    the Terra recipient address. The governance takes the responsibility for
-    verifying the immobility of the bETH being refunded and for taking all
-    required actions should the refunded bETH become movable again.
-
-    The call fails if `AnchorVault.can_deposit_or_withdraw()` returns false.
-
-    The same conversion rate from bETH to stETH as in the `withdraw` method
-    is applied. The call doesn't change the conversion rate.
-
-    See: `withdraw`, `burn_refunded_beth`.
-    """
-    steth_rate: uint256 = self._get_rate(True)
-    self.total_beth_refunded += _burned_beth_amount
-    steth_amount: uint256 = self._withdraw(_recipient, _burned_beth_amount, steth_rate)
-
-    log Refunded(_recipient, _burned_beth_amount, steth_amount, _comment)
-
-    return steth_amount
-
-
 @external
 def burn_refunded_beth(beth_amount: uint256):
     """
     @dev Burns bETH belonging to the AnchorVault contract address, assuming that
-         the corresponding stETH amount was already withdrawn from the vault
-         via the `_withdraw_for_refunding_burned_beth` method.
+         the corresponding stETH amount was already withdrawn from the vault.
 
     Can only be called by the current admin address.
 
@@ -613,7 +565,6 @@ def burn_refunded_beth(beth_amount: uint256):
     Reverts unless at least the specified bETH amount was refunded and wasn't
     burned yet.
 
-    See: `_withdraw_for_refunding_burned_beth`.
     """
     self._assert_admin(msg.sender)
 
@@ -624,46 +575,16 @@ def burn_refunded_beth(beth_amount: uint256):
 
     log RefundedBethBurned(beth_amount)
 
-
-@internal
-def _perform_refund_for_2022_01_26_incident():
-    """
-    @dev Withdraws stETH corresponding to bETH irreversibly locked at inaccessible Terra
-         addresses as the result of the 2022-01-26 incident caused by incorrect address
-         encoding produced by cached UI code after onchain migration to the Wormhole bridge.
-
-    Tx 1: 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d
-    bETH burned: 4449999990000000000
-
-    Tx 2: 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951
-    bETH burned: 439111118580000000000
-    """
-    # prevent this funciton from being called after the v3 upgrade (see `finalize_upgrade_v3`)
-    self._assert_version(0)
-    LIDO_DAO_FINANCE_MULTISIG: address = 0x48F300bD3C52c7dA6aAbDE4B683dEB27d38B9ABb
-    BETH_AMOUNT_BURNED: uint256 = 4449999990000000000 + 439111118580000000000
-    self._withdraw_for_refunding_burned_beth(
-        BETH_AMOUNT_BURNED,
-        LIDO_DAO_FINANCE_MULTISIG,
-        "refund for 2022-01-26 incident, txid 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951 and 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d"
-    )
-
-
 @external
-def finalize_upgrade_v3(emergency_admin: address):
+def finalize_upgrade_v4():
     """
-    @dev Performs state changes required for proxy upgrade from version 2 to version 3.
+    @dev Performs state changes required for proxy upgrade from version 3 to version 4.
 
     Can only be called by the current admin address.
     """
     self._assert_admin(msg.sender)
-    # in v2, the version() function returned constant value of 2; in the upgraded impl,
-    # the same function reads a storage slot that's zero until this function is called
-    self._assert_version(0)
-    self._perform_refund_for_2022_01_26_incident()
-    self._initialize_v3(emergency_admin)
-    self.operations_allowed = True
-
+    self._assert_version(3)
+    self._initialize_v4()
 
 @external
 def collect_rewards() -> uint256:
@@ -671,74 +592,4 @@ def collect_rewards() -> uint256:
     @dev Sells stETH rewards and transfers them to the distributor contract in the
          Terra blockchain.
     """
-    self._assert_not_stopped()
-
-    time_since_last_liquidation: uint256 = block.timestamp - self.last_liquidation_time
-
-    if msg.sender == self.liquidations_admin:
-        assert time_since_last_liquidation > self.no_liquidation_interval # dev: too early to sell
-    else:
-        assert time_since_last_liquidation > self.restricted_liquidation_interval # dev: too early to sell
-
-    # The code below sells all rewards accrued by stETH held in the vault to UST
-    # and forwards the outcome to the rewards distributor contract in Terra.
-    #
-    # To calculate the amount of rewards, we need to take the amount of stETH shares
-    # the vault holds and determine how these shares' price increased since the last
-    # rewards sell operation. We know that each shares that was transferred to the
-    # vault since then was worth the same amount of stETH because the vault reverts
-    # any deposits and withdrawals if the current share price is different from the
-    # one actual at the last rewards sell time (see `can_deposit_or_withdraw` fn).
-    #
-    # When calculating the difference in share price, we need to account for possible
-    # insurance applications that might have occured since the last rewards sell operation.
-    # Insurance is applied by burning stETH shares, and the resulting price increase of
-    # a single share shouldn't be considered as rewards and should recover bETH/stETH
-    # peg instead:
-    #
-    # rewards = vault_shares_bal * (new_share_price - prev_share_price)
-    #
-    # new_share_price = new_total_ether / new_total_shares
-    # new_total_ether = prev_total_ether + d_ether_io + d_rewards
-    # new_total_shares = prev_total_shares + d_shares_io - d_shares_insurance_burnt
-    #
-    # rewards_corrected = vault_shares_bal * (new_share_price_corrected - prev_share_price)
-    # new_share_price_corrected = new_total_ether / new_total_shares_corrected
-    # new_total_shares_corrected = prev_total_shares + d_shares_io
-    # new_share_price_corrected = new_total_ether / (new_total_shares + d_shares_insurance_burnt)
-
-    steth_token: address = self.steth_token
-    total_pooled_eth: uint256 = Lido(steth_token).totalSupply()
-    total_shares: uint256 = Lido(steth_token).getTotalShares()
-
-    share_price: uint256 = (10**18 * total_pooled_eth) / total_shares
-    shares_burnt: uint256 = InsuranceConnector(self.insurance_connector).total_shares_burnt()
-
-    prev_share_price: uint256 = self.last_liquidation_share_price
-    prev_shares_burnt: uint256 = self.last_liquidation_shares_burnt
-
-    self.last_liquidation_time = block.timestamp
-    self.last_liquidation_share_price = share_price
-    self.last_liquidation_shares_burnt = shares_burnt
-
-    shares_burnt_since: uint256 = shares_burnt - prev_shares_burnt
-    share_price_corrected: uint256 = (10**18 * total_pooled_eth) / (total_shares + shares_burnt_since)
-    shares_balance: uint256 = Lido(steth_token).sharesOf(self)
-
-    if share_price_corrected <= prev_share_price or shares_balance == 0:
-        log RewardsCollected(0, 0)
-        return 0
-
-    steth_to_sell: uint256 = shares_balance * (share_price_corrected - prev_share_price) / 10**18
-
-    connector: address = self.bridge_connector
-    liquidator: address = self.rewards_liquidator
-
-    ERC20(steth_token).transfer(liquidator, steth_to_sell)
-    ust_amount: uint256 = RewardsLiquidator(liquidator).liquidate(connector)
-
-    BridgeConnector(connector).forward_ust(self.anchor_rewards_distributor, ust_amount, b"")
-
-    log RewardsCollected(steth_to_sell, ust_amount)
-
-    return ust_amount
+    raise "Collect rewards stopped"
