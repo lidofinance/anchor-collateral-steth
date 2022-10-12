@@ -7,10 +7,14 @@ TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefa
 LIDO_DAO_FINANCE_MULTISIG = "0x48F300bD3C52c7dA6aAbDE4B683dEB27d38B9ABb"
 STETH_ERROR_MARGIN = 2
 
+
 @pytest.fixture(scope="module")
 def steth_approx_equal():
     def equal(steth_amount_a, steth_amount_b):
-        return math.isclose(a=steth_amount_a, b=steth_amount_b, abs_tol=STETH_ERROR_MARGIN)
+        return math.isclose(
+            a=steth_amount_a, b=steth_amount_b, abs_tol=STETH_ERROR_MARGIN
+        )
+
     return equal
 
 
@@ -22,7 +26,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     lido_oracle_report,
     deploy_vault_and_pass_dao_vote,
     deposit_amount,
-    steth_approx_equal
+    steth_approx_equal,
 ):
     """
     This is a big integrated test that validates,
@@ -37,7 +41,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
     This test runs in several stages.
 
-        Stage 0. Setup - declare all the necessary variables.
+        Stage 0. Setup - declare all the necessary variables and initialize contracts.
 
         Stage 1. Pre-upgrade - validate that we will change
         in this upcoming upgrade. This will help us understand
@@ -50,6 +54,10 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
         Stage 4. Mint - confirm that minting doesn't work. `submit` reverts
         and both beth and steth total supplies remain the same.
+
+        Stage 5. Rebase - simulate positive stETH rebase. The withdrawal rate only changes
+        in case of a negative rebase, but we will still simulate a positive rebase
+        to better simulate an actual behaviour of the protocol.
 
         Stage 5. Withdraw - confirm that the user can withdraw their bETH worth of stETH
         that were minted on Terra before the upgrade. We will simulate the bridging of funds
@@ -175,8 +183,15 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     assert postupgrade_terra_beth_minted_to_stranger == 0, "no beth was minted"
     assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
 
+    ###################
+    # STAGE 5. Rebase #
+    ###################
+
+    lido_oracle_report(steth_rebase_mult=1.01)
+    assert vault.can_deposit_or_withdraw()
+
     #####################
-    # STAGE 5. Withdraw #
+    # STAGE 6. Withdraw #
     #####################
 
     stranger_beth_native_balance_before_bridging = beth_token.balanceOf(stranger)
@@ -215,3 +230,141 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
         stranger_steth_balance_before_withdrawal
         + stranger_beth_native_balance_after_bridging,
     )
+
+
+@pytest.mark.parametrize("deposit_amount", [10 * 10**18])
+def test_withdraw_after_negative_rebase(
+    accounts,
+    stranger,
+    steth_token,
+    deploy_vault_and_pass_dao_vote,
+    lido_oracle_report,
+    deposit_amount,
+):
+    """
+      This test confirms that the rate of stETH to bETH for withdrawal changes
+      in an expected wat afte the upgrade.
+
+    This test runs in several stages.
+
+      Stage 0. Setup - declare all the necessary variables and initialize contracts.
+
+      Stage 1. Mint - mint some Terra-side bETH to work with after the upgrade
+
+      Stage 2. Upgrade - validate post-upgrade configuration
+
+      Stage 3. Bridging - simulate bridging bETH from Terra to Ethereum
+
+      Stage 4. Rebase - simulate negative stETH rebase
+
+      Stage 4. Withdraw - withdraw user bETH into stETH and confirm that the initial
+      deposit is greater than the amount withdrawn
+    """
+
+    ##################
+    # STAGE 0. Setup #
+    ##################
+
+    # initialize vault
+    vault = brownie.Contract.from_abi(
+        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
+    )
+
+    # initialize beth token
+    beth_token = brownie.interface.ERC20(vault.beth_token())
+
+    #################
+    # STAGE 1. Mint #
+    #################
+
+    prev_beth_total_supply = beth_token.totalSupply()
+
+    vault.submit(
+        deposit_amount,
+        TERRA_ADDRESS,
+        "0x8bada2e",
+        vault.version(),
+        {"from": stranger, "value": deposit_amount},
+    )
+
+    # before and after delta is stranger's balance, as we can't directly query stranger's balance
+    preupgrade_terra_beth_minted_to_stranger = (
+        beth_token.totalSupply() - prev_beth_total_supply
+    )
+    assert preupgrade_terra_beth_minted_to_stranger > 0, "new beth were minted"
+
+    # confirm pre-upgrade withdrawal rate
+    withdrawal_rate = (
+        steth_token.balanceOf(vault)
+        * 10**18
+        / (beth_token.totalSupply() - vault.total_beth_refunded())
+    )
+
+    assert vault.version() == 3
+    assert vault.get_rate() == withdrawal_rate
+
+    ####################
+    # STAGE 2. Upgrade #
+    ####################
+
+    # deploy a new vault implementation, start and enact DAO vote
+    deploy_vault_and_pass_dao_vote()
+    assert vault.version() == 4
+
+    #####################
+    # STAGE 3. Bridging #
+    #####################
+
+    stranger_beth_native_balance_before_bridging = beth_token.balanceOf(stranger)
+    assert stranger_beth_native_balance_before_bridging == 0
+
+    # simulate bridging from Terra
+    token_bridge = accounts.at(config.wormhole_token_bridge_addr, force=True)
+    beth_token.transfer(
+        stranger, preupgrade_terra_beth_minted_to_stranger, {"from": token_bridge}
+    )
+
+    # confirm that native beth balance equals preupgrade Terra beth balance
+    stranger_beth_native_balance_after_bridging = beth_token.balanceOf(stranger.address)
+    assert (
+        stranger_beth_native_balance_after_bridging
+        == preupgrade_terra_beth_minted_to_stranger
+    )
+
+    ###################
+    # STAGE 4. Rebase #
+    ###################
+
+    lido_oracle_report(steth_rebase_mult=0.9)
+    assert vault.can_deposit_or_withdraw()
+
+
+    #####################
+    # STAGE 5. Withdraw #
+    #####################
+
+    # check that stETH to bETH withdrawal rate is less than 1 to 1
+    withdrawal_rate = (
+        steth_token.balanceOf(vault)
+        * 10**18
+        / (beth_token.totalSupply() - vault.total_beth_refunded())
+    )
+
+    # withdrawal rate decreased
+    assert withdrawal_rate < 10**18
+
+
+    stranger_steth_balance_before_withdrawal = steth_token.balanceOf(stranger.address)
+
+    vault.withdraw(
+        preupgrade_terra_beth_minted_to_stranger, vault.version(), {"from": stranger}
+    )
+
+    stranger_steth_balance_after_withdrawal = steth_token.balanceOf(stranger.address)
+    assert (
+        stranger_steth_balance_after_withdrawal + STETH_ERROR_MARGIN
+        < stranger_steth_balance_before_withdrawal
+        + preupgrade_terra_beth_minted_to_stranger
+    )
+
+    
