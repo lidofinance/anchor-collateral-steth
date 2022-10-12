@@ -114,7 +114,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
     # simulate positive rebase and check withdrawal rate
     lido_oracle_report(steth_rebase_mult=1.01)
-    vault.get_rate() == 10**18
+    assert vault.get_rate() == 10**18
 
     # rewards are collectable
     vault.collect_rewards({"from": liquidations_admin})
