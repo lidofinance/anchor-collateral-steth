@@ -177,12 +177,12 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     postupgrade_terra_beth_minted_to_stranger = (
         beth_token.totalSupply() - prev_beth_total_supply
     )
-    steth_minted_to_stranger_post_upgrade = (
+    postupgrade_steth_minted_to_stranger = (
         steth_token.totalSupply() - prev_steth_total_supply
     )
 
     assert postupgrade_terra_beth_minted_to_stranger == 0, "no beth was minted"
-    assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
+    assert postupgrade_steth_minted_to_stranger == 0, "no steth was minted"
 
     ###################
     # STAGE 5. Rebase #
