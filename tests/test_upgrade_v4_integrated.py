@@ -543,3 +543,52 @@ def test_emergency_stop_works_as_before(
     with brownie.reverts("Collect rewards stopped"):
         vault.collect_rewards({"from": liquidations_admin})
 
+
+@pytest.mark.parametrize("deposit_amount", [10 * 10**18])
+def test_mint_beth_from_steth_disabled(
+    stranger,
+    lido,
+    deploy_vault_and_pass_dao_vote,
+    deposit_amount,
+):
+    # initialize vault
+    vault = brownie.Contract.from_abi(
+        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
+    )
+
+    # initialize Lido
+    lido = brownie.interface.Lido(vault.steth_token())
+
+    # initialize beth
+    beth_token = brownie.interface.ERC20(vault.beth_token())
+
+    deploy_vault_and_pass_dao_vote()
+
+    lido.submit(brownie.ZERO_ADDRESS, {"from": stranger, "value": deposit_amount})
+
+    lido.approve(vault.address, deposit_amount, {"from": stranger})
+
+    # confirm approve
+    assert lido.allowance(stranger.address, vault.address) == deposit_amount
+
+    prev_beth_total_supply = beth_token.totalSupply()
+    prev_steth_total_supply = lido.totalSupply()
+
+    with brownie.reverts(
+        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+    ):
+        vault.submit(
+            deposit_amount,
+            TERRA_ADDRESS,
+            "0x8bada2e",
+            vault.version(),
+            {"from": stranger},
+        )
+
+    postupgrade_terra_beth_minted_to_stranger = (
+        beth_token.totalSupply() - prev_beth_total_supply
+    )
+    steth_minted_to_stranger_post_upgrade = lido.totalSupply() - prev_steth_total_supply
+
+    assert postupgrade_terra_beth_minted_to_stranger == 0, "no beth was minted"
+    assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
