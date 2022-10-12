@@ -338,7 +338,6 @@ def test_withdraw_after_negative_rebase(
     lido_oracle_report(steth_rebase_mult=0.9)
     assert vault.can_deposit_or_withdraw()
 
-
     #####################
     # STAGE 5. Withdraw #
     #####################
@@ -353,7 +352,6 @@ def test_withdraw_after_negative_rebase(
     # withdrawal rate decreased
     assert withdrawal_rate < 10**18
 
-
     stranger_steth_balance_before_withdrawal = steth_token.balanceOf(stranger.address)
 
     vault.withdraw(
@@ -367,4 +365,181 @@ def test_withdraw_after_negative_rebase(
         + preupgrade_terra_beth_minted_to_stranger
     )
 
-    
+
+@pytest.mark.parametrize("deposit_amount", [10 * 10**18])
+def test_emergency_stop_works_as_before(
+    accounts,
+    stranger,
+    steth_token,
+    deposit_amount,
+    deploy_vault_and_pass_dao_vote,
+    steth_approx_equal,
+    lido_oracle_report,
+):
+    ##################
+    # STAGE 0. Setup #
+    ##################
+
+    # initialize vault
+    vault = brownie.Contract.from_abi(
+        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
+    )
+
+    # initialize beth token
+    beth_token = brownie.interface.ERC20(vault.beth_token())
+
+    # take over emergency admin account
+    emergency_admin = accounts.at(vault.emergency_admin(), True)
+
+    # take over liquidation admin account
+    liquidations_admin = accounts.at(vault.liquidations_admin(), True)
+
+    # take over dao agent
+    dao_agent = accounts.at(config.lido_dao_agent_address, True)
+
+    #################
+    # STAGE 1. Mint #
+    #################
+
+    prev_beth_total_supply = beth_token.totalSupply()
+
+    vault.submit(
+        deposit_amount,
+        TERRA_ADDRESS,
+        "0x8bada2e",
+        vault.version(),
+        {"from": stranger, "value": deposit_amount},
+    )
+
+    # before and after delta is stranger's balance, as we can't directly query stranger's balance
+    preupgrade_terra_beth_minted_to_stranger = (
+        beth_token.totalSupply() - prev_beth_total_supply
+    )
+    assert preupgrade_terra_beth_minted_to_stranger > 0, "new beth were minted"
+
+    ####################
+    # STAGE 2. Upgrade #
+    ####################
+
+    # deploy a new vault implementation, start and enact DAO vote
+    deploy_vault_and_pass_dao_vote()
+    assert vault.version() == 4
+
+    #####################
+    # STAGE 3. Bridging #
+    #####################
+
+    stranger_beth_native_balance_before_bridging = beth_token.balanceOf(stranger)
+    assert stranger_beth_native_balance_before_bridging == 0
+
+    # simulate bridging from Terra
+    token_bridge = accounts.at(config.wormhole_token_bridge_addr, force=True)
+    beth_token.transfer(
+        stranger, preupgrade_terra_beth_minted_to_stranger, {"from": token_bridge}
+    )
+
+    # confirm that native beth balance equals preupgrade Terra beth balance
+    stranger_beth_native_balance_after_bridging = beth_token.balanceOf(stranger.address)
+    assert (
+        stranger_beth_native_balance_after_bridging
+        == preupgrade_terra_beth_minted_to_stranger
+    )
+
+    ###################
+    # STAGE 4. Rebase #
+    ###################
+
+    lido_oracle_report(steth_rebase_mult=1.01)
+    assert vault.can_deposit_or_withdraw()
+
+    # collect rewards does not work
+    with brownie.reverts("Collect rewards stopped"):
+        vault.collect_rewards({"from": liquidations_admin})
+
+    #################
+    # STAGE 5. Stop #
+    #################
+
+    vault.emergency_stop({"from": emergency_admin})
+
+    # vault is not operating
+    assert not vault.can_deposit_or_withdraw()
+
+    # nope, doesn't work
+    with brownie.reverts(
+        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+    ):
+        vault.submit(
+            deposit_amount,
+            TERRA_ADDRESS,
+            "0x8bada2e",
+            vault.version(),
+            {"from": stranger, "value": deposit_amount},
+        )
+
+    stranger_steth_balance_before_withdrawal = steth_token.balanceOf(stranger.address)
+
+    with brownie.reverts("contract stopped"):
+        vault.withdraw(
+            preupgrade_terra_beth_minted_to_stranger,
+            vault.version(),
+            {"from": stranger},
+        )
+
+    stranger_steth_balance_after_withdrawal = steth_token.balanceOf(stranger.address)
+    # balance hasn't changed
+    assert (
+        stranger_steth_balance_before_withdrawal
+        == stranger_steth_balance_after_withdrawal
+    )
+
+    # collect rewards still does not work
+    with brownie.reverts("Collect rewards stopped"):
+        vault.collect_rewards({"from": liquidations_admin})
+
+    ###################
+    # STAGE 6. Resume #
+    ###################
+
+    vault.resume({"from": dao_agent})
+
+    # vault is not operating
+    assert vault.can_deposit_or_withdraw()
+
+    # minting doesn't work
+    with brownie.reverts(
+        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+    ):
+        vault.submit(
+            deposit_amount,
+            TERRA_ADDRESS,
+            "0x8bada2e",
+            vault.version(),
+            {"from": stranger, "value": deposit_amount},
+        )
+
+    stranger_steth_balance_before_withdrawal = steth_token.balanceOf(stranger.address)
+    # withdraw bETH in stETH
+    vault.withdraw(
+        stranger_beth_native_balance_after_bridging, vault.version(), {"from": stranger}
+    )
+
+    # confirm that all bETH were withdrawn
+    stranger_beth_native_balance_after_withdrawal = beth_token.balanceOf(
+        stranger.address
+    )
+    assert stranger_beth_native_balance_after_withdrawal == 0
+
+    # confirm that stETH balance is now stETH before + bETH withdrawn
+    # it's okay to simply add up these values because withdrawal rate is normally 1 to 1
+    # as there was no negative rebase
+    assert steth_approx_equal(
+        steth_token.balanceOf(stranger.address),
+        stranger_steth_balance_before_withdrawal
+        + stranger_beth_native_balance_after_bridging,
+    )
+
+    # collect rewards still does not work
+    with brownie.reverts("Collect rewards stopped"):
+        vault.collect_rewards({"from": liquidations_admin})
+
