@@ -3,25 +3,9 @@
 # @licence MIT
 from vyper.interfaces import ERC20
 
-
-interface BridgeConnector:
-    def forward_beth(terra_address: bytes32, amount: uint256, extra_data: Bytes[1024]): nonpayable
-    def forward_ust(terra_address: bytes32, amount: uint256, extra_data: Bytes[1024]): nonpayable
-    def adjust_amount(amount: uint256, decimals: uint256) -> uint256: view
-
-
-interface RewardsLiquidator:
-    def liquidate(ust_recipient: address) -> uint256: nonpayable
-
-
-interface InsuranceConnector:
-    def total_shares_burnt() -> uint256: view
-
-
 interface Mintable:
     def mint(owner: address, amount: uint256): nonpayable
     def burn(owner: address, amount: uint256): nonpayable
-
 
 interface Lido:
     def submit(referral: address) -> uint256: payable
@@ -30,73 +14,22 @@ interface Lido:
     def sharesOf(owner: address) -> uint256: view
     def getPooledEthByShares(shares_amount: uint256) -> uint256: view
 
-
-event Deposited:
-    sender: indexed(address)
-    amount: uint256
-    terra_address: bytes32
-    beth_amount_received: uint256
-
-
 event Withdrawn:
     recipient: indexed(address)
     amount: uint256
     steth_amount_received: uint256
 
-
-event Refunded:
-    recipient: indexed(address)
-    beth_amount: uint256
-    steth_amount: uint256
-    comment: String[1024]
-
-
-event RefundedBethBurned:
-    beth_amount: uint256
-
-
-event RewardsCollected:
-    steth_amount: uint256
-    ust_amount: uint256
-
-
 event AdminChanged:
     new_admin: address
-
 
 event EmergencyAdminChanged:
     new_emergency_admin: address
 
-
-event BridgeConnectorUpdated:
-    bridge_connector: address
-
-
-event RewardsLiquidatorUpdated:
-    rewards_liquidator: address
-
-
-event InsuranceConnectorUpdated:
-    insurance_connector: address
-
-
-event LiquidationConfigUpdated:
-    liquidations_admin: address
-    no_liquidation_interval: uint256
-    restricted_liquidation_interval: uint256
-
-
-event AnchorRewardsDistributorUpdated:
-    anchor_rewards_distributor: bytes32
-
-
 event VersionIncremented:
     new_version: uint256
 
-
 event OperationsStopped:
     pass
-
 
 event OperationsResumed:
     pass
@@ -104,7 +37,6 @@ event OperationsResumed:
 
 BETH_DECIMALS: constant(uint256) = 18
 
-# A constant used in `_can_deposit_or_withdraw` when comparing Lido share prices.
 #
 # Due to integer rounding, Lido.getPooledEthByShares(10**18) may return slightly
 # different numbers even if there were no oracle reports between two calls. This
@@ -151,7 +83,6 @@ last_liquidation_shares_burnt: public(uint256)
 # The following functions revert unless the value of the `_expected_version` argument
 # matches the one stored in this state variable:
 #
-# * `deposit`
 # * `withdraw`
 #
 # It's recommended for any external code interacting with this contract, both onchain
@@ -237,9 +168,7 @@ def emergency_stop():
 
     While contract is in the stopped state, the following functions revert:
 
-    * `submit`
     * `withdraw`
-    * `collect_rewards`
 
     See `resume`, `set_emergency_admin`.
     """
@@ -306,145 +235,6 @@ def bump_version():
     self.version = new_version
     log VersionIncremented(new_version)
 
-
-@internal
-def _set_bridge_connector(_bridge_connector: address):
-    self.bridge_connector = _bridge_connector
-    log BridgeConnectorUpdated(_bridge_connector)
-
-
-@external
-def set_bridge_connector(_bridge_connector: address):
-    """
-    @dev Sets the bridge connector contract: an adapter contract for communicating
-         with the Terra bridge.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_bridge_connector(_bridge_connector)
-
-
-@internal
-def _set_rewards_liquidator(_rewards_liquidator: address):
-    self.rewards_liquidator = _rewards_liquidator # dev: unauthorized
-    log RewardsLiquidatorUpdated(_rewards_liquidator)
-
-
-@external
-def set_rewards_liquidator(_rewards_liquidator: address):
-    """
-    @dev Sets the rewards liquidator contract: a contract for selling stETH rewards to UST.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_rewards_liquidator(_rewards_liquidator)
-
-
-@internal
-def _set_insurance_connector(_insurance_connector: address):
-    self.insurance_connector = _insurance_connector
-    log InsuranceConnectorUpdated(_insurance_connector)
-
-
-@external
-def set_insurance_connector(_insurance_connector: address):
-    """
-    @dev Sets the insurance connector contract: a contract for obtaining the total number of
-         shares burnt for the purpose of insurance/cover application from the Lido protocol.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_insurance_connector(_insurance_connector)
-
-
-@internal
-def _set_liquidation_config(
-    _liquidations_admin: address,
-    _no_liquidation_interval: uint256,
-    _restricted_liquidation_interval: uint256
-):
-    assert _restricted_liquidation_interval >= _no_liquidation_interval
-
-    self.liquidations_admin = _liquidations_admin
-    self.no_liquidation_interval = _no_liquidation_interval
-    self.restricted_liquidation_interval = _restricted_liquidation_interval
-
-    log LiquidationConfigUpdated(
-        _liquidations_admin,
-        _no_liquidation_interval,
-        _restricted_liquidation_interval
-    )
-
-
-@external
-def set_liquidation_config(
-    _liquidations_admin: address,
-    _no_liquidation_interval: uint256,
-    _restricted_liquidation_interval: uint256,
-):
-    """
-    @dev Sets the liquidation config consisting of liquidation admin, the address that is allowed
-         to sell stETH rewards to UST during after the no-liquidation interval ends and before
-         the restricted liquidation interval ends, as well as both intervals.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_liquidation_config(
-        _liquidations_admin,
-        _no_liquidation_interval,
-        _restricted_liquidation_interval
-    )
-
-
-@internal
-def _set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
-    self.anchor_rewards_distributor = _anchor_rewards_distributor
-    log AnchorRewardsDistributorUpdated(_anchor_rewards_distributor)
-
-
-@external
-def set_anchor_rewards_distributor(_anchor_rewards_distributor: bytes32):
-    """
-    @dev Sets the Terra-side UST rewards distributor contract allowing Terra-side bETH holders
-         to claim their staking rewards in the UST form.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
-
-
-@external
-def configure(
-    _bridge_connector: address,
-    _rewards_liquidator: address,
-    _insurance_connector: address,
-    _liquidations_admin: address,
-    _no_liquidation_interval: uint256,
-    _restricted_liquidation_interval: uint256,
-    _anchor_rewards_distributor: bytes32,
-):
-    """
-    @dev A shortcut function for setting all admin-configurable settings at once.
-
-    Can only be called by the current admin address.
-    """
-    self._assert_admin(msg.sender)
-    self._set_bridge_connector(_bridge_connector)
-    self._set_rewards_liquidator(_rewards_liquidator)
-    self._set_insurance_connector(_insurance_connector)
-    self._set_liquidation_config(
-        _liquidations_admin,
-        _no_liquidation_interval,
-        _restricted_liquidation_interval
-    )
-    self._set_anchor_rewards_distributor(_anchor_rewards_distributor)
-
-
 @internal
 @view
 def _get_rate(_is_withdraw_rate: bool) -> uint256:
@@ -472,20 +262,6 @@ def get_rate() -> uint256:
     """
     return self._get_rate(False)
 
-@view
-@external
-def can_deposit_or_withdraw() -> bool:
-    """
-    @dev Whether deposits and withdrawals are enabled.
-
-    Deposits and withdrawals are disabled if stETH token has rebased (e.g. Lido
-    oracle reported Beacon chain rewards/penalties or insurance was applied) but
-    vault rewards accrued since the last rewards sell operation are not sold to
-    UST yet. Normally, this period should not last more than a couple of minutes
-    each 24h.
-    """
-    return self.operations_allowed
-
 
 @external
 @payable
@@ -496,30 +272,17 @@ def submit(
     _expected_version: uint256
 ) -> (uint256, uint256):
     """
-    @dev Locks the `_amount` of provided ETH or stETH tokens in return for bETH tokens
-         minted to the `_terra_address` address on the Terra blockchain.
+    @dev Lido stopped maintaining the Anchor <> stETH integration.
 
-    When ETH is provided, it will be deposited to Lido and converted to stETH first.
-    In this case, transaction value must be the same as `_amount` argument.
-
-    To provide stETH, set the transavtion value to zero and approve this contract for spending
-    the `_amount` of stETH on your behalf.
-
-    The call fails if `AnchorVault.can_deposit_or_withdraw()` is false.
-
-    The conversion rate from stETH to bETH should normally be 1 but might be different after
-    severe penalties inflicted on the Lido validators. You can obtain the current conversion
-    rate by calling `AnchorVault.get_rate()`.
+    Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367.
     """
-    raise "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+    raise "Minting is closed"
 
 @internal
 def _withdraw(recipient: address, beth_amount: uint256, steth_rate: uint256) -> uint256:
     steth_amount: uint256 = (beth_amount * steth_rate) / 10**18
     ERC20(self.steth_token).transfer(recipient, steth_amount)
     return steth_amount
-
-
 
 @external
 def withdraw(
@@ -533,8 +296,6 @@ def withdraw(
 
     To withdraw Terra-side bETH, you should firstly transfer the tokens to the Ethereum
     blockchain.
-
-    The call fails if `AnchorVault.can_deposit_or_withdraw()` returns false.
 
     The conversion rate from stETH to bETH should normally be 1 but might be different after
     severe penalties inflicted on the Lido validators. You can obtain the current conversion
@@ -552,30 +313,6 @@ def withdraw(
     return steth_amount
 
 @external
-def burn_refunded_beth(beth_amount: uint256):
-    """
-    @dev Burns bETH belonging to the AnchorVault contract address, assuming that
-         the corresponding stETH amount was already withdrawn from the vault.
-
-    Can only be called by the current admin address.
-
-    Used by the governance to actually burn bETH that previously became locked as
-    the result of a contract or user error and was subsequently refunded.
-
-    Reverts unless at least the specified bETH amount was refunded and wasn't
-    burned yet.
-
-    """
-    self._assert_admin(msg.sender)
-
-    # this will revert if beth_amount exceeds total_beth_refunded
-    self.total_beth_refunded -= beth_amount
-
-    Mintable(self.beth_token).burn(self, beth_amount)
-
-    log RefundedBethBurned(beth_amount)
-
-@external
 def finalize_upgrade_v4():
     """
     @dev Performs state changes required for proxy upgrade from version 3 to version 4.
@@ -589,7 +326,6 @@ def finalize_upgrade_v4():
 @external
 def collect_rewards() -> uint256:
     """
-    @dev Sells stETH rewards and transfers them to the distributor contract in the
-         Terra blockchain.
+    @dev Lido stopped maintaining the Anchor <> stETH integration.
     """
     raise "Collect rewards stopped"
