@@ -244,7 +244,7 @@ def test_expected_withdrawal_rate_after_negative_rebase(
 ):
     """
       This test confirms that the rate of stETH to bETH for withdrawal changes
-      in an expected wat afte the upgrade.
+      in an expected way after the upgrade.
 
     This test runs in several stages.
 
