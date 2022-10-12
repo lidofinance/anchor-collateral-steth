@@ -233,7 +233,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
 
 @pytest.mark.parametrize("deposit_amount", [10 * 10**18])
-def test_withdraw_after_negative_rebase(
+def test_expected_withdrawal_rate_after_negative_rebase(
     accounts,
     stranger,
     steth_token,
@@ -367,7 +367,7 @@ def test_withdraw_after_negative_rebase(
 
 
 @pytest.mark.parametrize("deposit_amount", [10 * 10**18])
-def test_emergency_stop_works_as_before(
+def test_emergency_stop_works_as_expected(
     accounts,
     stranger,
     steth_token,
@@ -545,7 +545,7 @@ def test_emergency_stop_works_as_before(
 
 
 @pytest.mark.parametrize("deposit_amount", [10 * 10**18])
-def test_mint_beth_from_steth_disabled(
+def test_minting_beth_from_steth_disabled(
     stranger,
     lido,
     deploy_vault_and_pass_dao_vote,
