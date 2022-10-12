@@ -44,7 +44,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
         Stage 0. Setup - declare all the necessary variables and initialize contracts.
 
-        Stage 1. Pre-upgrade - validate that we will change
+        Stage 1. Pre-upgrade - validate what we will change
         in this upcoming upgrade. This will help us understand
         what has changed after the upgrade.
 
