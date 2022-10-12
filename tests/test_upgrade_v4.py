@@ -31,7 +31,8 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     """
     This is a big integrated test that validates,
         a) minting after the v4 upgrade is disabled,
-        b) any bETH that were minted before the upgrade are still withdrawable.
+        b) any bETH that were minted before the upgrade are still withdrawable,
+        c) the 2022_01_26 incident mitigation is not performed again.
 
     Why is this test so big?
 
