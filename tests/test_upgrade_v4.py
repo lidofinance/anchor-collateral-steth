@@ -1,6 +1,7 @@
 import math
 import pytest
 import brownie
+from utils.beth import beth_holders
 import utils.config as config
 
 TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
@@ -593,3 +594,32 @@ def test_minting_beth_from_steth_disabled(
 
     assert postupgrade_terra_beth_minted_to_stranger == 0, "no beth was minted"
     assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
+
+
+@pytest.mark.parametrize("holder", beth_holders[:5])
+def test_withdraw_using_actual_holders(
+    accounts, steth_token, beth_token, holder, deploy_vault_and_pass_dao_vote
+):
+    vault = brownie.Contract.from_abi(
+        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
+    )
+
+    deploy_vault_and_pass_dao_vote()
+
+    [holder_address, _, _] = holder
+
+    holder_account = accounts.at(holder_address, True)
+
+    # not using balances from csv, since they may change
+    prev_beth_balance = beth_token.balanceOf(holder_account)
+    prev_steth_balance = steth_token.balanceOf(holder_account)
+
+    tx = vault.withdraw(
+        prev_beth_balance, vault.version(), holder_account, {"from": holder_account}
+    )
+
+    assert beth_token.balanceOf(holder_account) == 0
+    assert (
+        steth_token.balanceOf(holder_account) == prev_steth_balance + prev_beth_balance
+    )
+    
