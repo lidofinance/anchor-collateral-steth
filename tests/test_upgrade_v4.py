@@ -120,9 +120,6 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     # rewards are collectable
     vault.collect_rewards({"from": liquidations_admin})
 
-    # vault is operating
-    assert vault.can_deposit_or_withdraw()
-
     ####################
     # STAGE 2. Upgrade #
     ####################
@@ -145,7 +142,6 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     assert vault.rewards_liquidator() == config.rewards_liquidator_addr
     assert vault.insurance_connector() == config.insurance_connector_addr
     assert vault.liquidations_admin() == config.vault_liquidations_admin_addr
-    assert vault.can_deposit_or_withdraw()
 
     #######################
     # STAGE 3. 2022/01/26 #
@@ -165,7 +161,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     prev_steth_total_supply = steth_token.totalSupply()
 
     with brownie.reverts(
-        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+        "Minting is closed"
     ):
         vault.submit(
             deposit_amount,
@@ -190,7 +186,6 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     ###################
 
     lido_oracle_report(steth_rebase_mult=1.01)
-    assert vault.can_deposit_or_withdraw()
 
     #####################
     # STAGE 6. Withdraw #
@@ -338,7 +333,6 @@ def test_expected_withdrawal_rate_after_negative_rebase(
     ###################
 
     lido_oracle_report(steth_rebase_mult=0.9)
-    assert vault.can_deposit_or_withdraw()
 
     #####################
     # STAGE 5. Withdraw #
@@ -452,7 +446,6 @@ def test_emergency_stop_works_as_expected(
     ###################
 
     lido_oracle_report(steth_rebase_mult=1.01)
-    assert vault.can_deposit_or_withdraw()
 
     # collect rewards does not work
     with brownie.reverts("Collect rewards stopped"):
@@ -464,12 +457,9 @@ def test_emergency_stop_works_as_expected(
 
     vault.emergency_stop({"from": emergency_admin})
 
-    # vault is not operating
-    assert not vault.can_deposit_or_withdraw()
-
     # nope, doesn't work
     with brownie.reverts(
-        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+        "Minting is closed"
     ):
         vault.submit(
             deposit_amount,
@@ -505,12 +495,9 @@ def test_emergency_stop_works_as_expected(
 
     vault.resume({"from": dao_agent})
 
-    # vault is not operating
-    assert vault.can_deposit_or_withdraw()
-
     # minting doesn't work
     with brownie.reverts(
-        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+        "Minting is closed"
     ):
         vault.submit(
             deposit_amount,
@@ -577,7 +564,7 @@ def test_minting_beth_from_steth_disabled(
     prev_steth_total_supply = lido.totalSupply()
 
     with brownie.reverts(
-        "Minting is closed. Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367"
+        "Minting is closed"
     ):
         vault.submit(
             deposit_amount,
@@ -596,7 +583,7 @@ def test_minting_beth_from_steth_disabled(
     assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
 
 
-@pytest.mark.parametrize("holder", beth_holders[:5])
+@pytest.mark.parametrize("holder", beth_holders)
 def test_withdraw_using_actual_holders(
     accounts, steth_token, beth_token, holder, deploy_vault_and_pass_dao_vote
 ):
