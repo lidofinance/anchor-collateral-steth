@@ -1,7 +1,7 @@
 import math
 import pytest
 import brownie
-from utils.beth import beth_holders
+from utils.beth import BETH_BURNED, beth_holders
 import utils.config as config
 
 TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
@@ -160,9 +160,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     prev_beth_total_supply = beth_token.totalSupply()
     prev_steth_total_supply = steth_token.totalSupply()
 
-    with brownie.reverts(
-        "Minting is closed"
-    ):
+    with brownie.reverts("Minting is closed"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -458,9 +456,7 @@ def test_emergency_stop_works_as_expected(
     vault.emergency_stop({"from": emergency_admin})
 
     # nope, doesn't work
-    with brownie.reverts(
-        "Minting is closed"
-    ):
+    with brownie.reverts("Minting is closed"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -496,9 +492,7 @@ def test_emergency_stop_works_as_expected(
     vault.resume({"from": dao_agent})
 
     # minting doesn't work
-    with brownie.reverts(
-        "Minting is closed"
-    ):
+    with brownie.reverts("Minting is closed"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -563,9 +557,7 @@ def test_minting_beth_from_steth_disabled(
     prev_beth_total_supply = beth_token.totalSupply()
     prev_steth_total_supply = lido.totalSupply()
 
-    with brownie.reverts(
-        "Minting is closed"
-    ):
+    with brownie.reverts("Minting is closed"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -583,30 +575,47 @@ def test_minting_beth_from_steth_disabled(
     assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
 
 
-@pytest.mark.parametrize("holder", beth_holders)
 def test_withdraw_using_actual_holders(
-    accounts, steth_token, beth_token, holder, deploy_vault_and_pass_dao_vote
+    accounts, steth_token, deploy_vault_and_pass_dao_vote, steth_approx_equal
 ):
     vault = brownie.Contract.from_abi(
         "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
     )
 
+    beth_token = brownie.interface.ERC20(vault.beth_token())
+
     deploy_vault_and_pass_dao_vote()
 
-    [holder_address, _, _] = holder
+    prev_total_supply = beth_token.totalSupply()
+    withdrawn = 0
 
-    holder_account = accounts.at(holder_address, True)
+    for holder in beth_holders:
+        [holder_address, _, _] = holder
 
-    # not using balances from csv, since they may change
-    prev_beth_balance = beth_token.balanceOf(holder_account)
-    prev_steth_balance = steth_token.balanceOf(holder_account)
+        holder_account = accounts.at(holder_address, True)
 
-    tx = vault.withdraw(
-        prev_beth_balance, vault.version(), holder_account, {"from": holder_account}
-    )
+        # not using balances from csv, since they may change
+        prev_beth_balance = beth_token.balanceOf(holder_account)
+        prev_steth_balance = steth_token.balanceOf(holder_account)
 
-    assert beth_token.balanceOf(holder_account) == 0
-    assert (
-        steth_token.balanceOf(holder_account) == prev_steth_balance + prev_beth_balance
-    )
-    
+        is_wormhole = holder_account.address == config.wormhole_token_bridge_addr
+
+        withdraw_amount = prev_beth_balance
+
+        if is_wormhole:
+            withdraw_amount = prev_beth_balance - BETH_BURNED
+
+        print("HOLDER", holder_account)
+        vault.withdraw(
+            withdraw_amount, vault.version(), holder_account, {"from": holder_account}
+        )
+
+        withdrawn += withdraw_amount
+
+        assert beth_token.balanceOf(holder_account) == prev_beth_balance - withdraw_amount
+        assert steth_approx_equal(
+            steth_token.balanceOf(holder_account),
+            prev_steth_balance + withdraw_amount,
+        )
+
+    assert beth_token.totalSupply() == prev_total_supply - withdrawn
