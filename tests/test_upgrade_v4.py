@@ -605,7 +605,6 @@ def test_withdraw_using_actual_holders(
         if is_wormhole:
             withdraw_amount = prev_beth_balance - BETH_BURNED
 
-        print("HOLDER", holder_account)
         vault.withdraw(
             withdraw_amount, vault.version(), holder_account, {"from": holder_account}
         )
@@ -619,3 +618,4 @@ def test_withdraw_using_actual_holders(
         )
 
     assert beth_token.totalSupply() == prev_total_supply - withdrawn
+    assert beth_token.totalSupply() == BETH_BURNED
