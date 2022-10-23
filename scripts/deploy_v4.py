@@ -11,7 +11,7 @@ except ImportError:
 from utils.dao import (
     create_vote,
     encode_proxy_upgrade,
-    encode_bump_version,
+    encode_finalize_upgrade_v4,
     encode_call_script
 )
 
@@ -63,13 +63,13 @@ def deploy_and_start_dao_vote(tx_params):
             new_impl_address=anchor_new_vault,
             setup_calldata=b''
         ),
-        encode_bump_version()
+        encode_finalize_upgrade_v4()
     ])
 
     (vote_id, tx) = create_vote(
         voting=voting,
         token_manager=token_manager,
-        vote_desc=f"1. Update anchor vault {anchor_new_vault}\n2. Increase vault version",
+        vote_desc=f"1. Update anchor vault implementation {anchor_new_vault}\n2. Increase vault version to v4",
         evm_script=evm_script,
         tx_params=tx_params
     )

@@ -77,3 +77,8 @@ def prompt_bool():
 
     sys.stdout.write("Please respond with 'yes' or 'no'")
 
+
+def progress(_cur, _max):
+    p = round(100*_cur/_max)
+    b = f"Progress: {p}% - ["+"."*int(p/5)+" "*(20-int(p/5))+"]"
+    print(b, end="\r")

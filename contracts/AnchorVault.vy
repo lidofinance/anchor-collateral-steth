@@ -4,14 +4,9 @@
 from vyper.interfaces import ERC20
 
 interface Mintable:
-    def mint(owner: address, amount: uint256): nonpayable
     def burn(owner: address, amount: uint256): nonpayable
 
 interface Lido:
-    def submit(referral: address) -> uint256: payable
-    def totalSupply() -> uint256: view
-    def getTotalShares() -> uint256: view
-    def sharesOf(owner: address) -> uint256: view
     def getPooledEthByShares(shares_amount: uint256) -> uint256: view
 
 event Withdrawn:
@@ -33,23 +28,6 @@ event OperationsStopped:
 
 event OperationsResumed:
     pass
-
-
-BETH_DECIMALS: constant(uint256) = 18
-
-#
-# Due to integer rounding, Lido.getPooledEthByShares(10**18) may return slightly
-# different numbers even if there were no oracle reports between two calls. This
-# might happen if someone submits ETH before the second call. It can be mathematically
-# proven that this difference won't be more than 10 wei given that Lido holds at least
-# 0.1 ETH and the share price is of the same order of magnitude as the amount of ETH
-# held. Both of these conditions are true if Lido operates normally—and if it doesn't,
-# it's desirable for AnchorVault operations to be suspended. See:
-#
-# https://github.com/lidofinance/lido-dao/blob/eb33eb8/contracts/0.4.24/Lido.sol#L445
-# https://github.com/lidofinance/lido-dao/blob/eb33eb8/contracts/0.4.24/StETH.sol#L288
-#
-STETH_SHARE_PRICE_MAX_ERROR: constant(uint256) = 10
 
 # Aragon Agent contract of the Lido DAO
 LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
@@ -76,9 +54,8 @@ last_liquidation_share_price: public(uint256)
 last_liquidation_shares_burnt: public(uint256)
 
 # The contract version. Used to mark backwards-incompatible changes to the contract
-# logic, including installing delegates with an incompatible API. Can be changed both
-# in `_initialize_vX` after implementation code changes and by calling `bump_version`
-# after installing a new delegate.
+# logic, including installing delegates with an incompatible API. Can be changed
+# in `_initialize_vX` after implementation.
 #
 # The following functions revert unless the value of the `_expected_version` argument
 # matches the one stored in this state variable:
@@ -97,7 +74,6 @@ emergency_admin: public(address)
 operations_allowed: public(bool)
 
 total_beth_refunded: public(uint256)
-
 
 @internal
 def _assert_version(_expected_version: uint256):
@@ -219,48 +195,15 @@ def set_emergency_admin(new_emergency_admin: address):
     self.emergency_admin = new_emergency_admin
     log EmergencyAdminChanged(new_emergency_admin)
 
-
-@external
-def bump_version():
-    """
-    @dev Increments contract version. Can only be called by the current admin address.
-
-    Due to the usage of replaceable delegates, contract version cannot be compiled to
-    the AnchorVault implementation as a constant. Instead, the governance should call
-    this function when backwards-incompatible changes are made to the contract or its
-    delegates.
-    """
-    self._assert_admin(msg.sender)
-    new_version: uint256 = self.version + 1
-    self.version = new_version
-    log VersionIncremented(new_version)
-
 @internal
 @view
-def _get_rate(_is_withdraw_rate: bool) -> uint256:
+def _get_rate() -> uint256:
     steth_balance: uint256 = ERC20(self.steth_token).balanceOf(self)
     beth_supply: uint256 = ERC20(self.beth_token).totalSupply() - self.total_beth_refunded
     if steth_balance >= beth_supply:
         return 10**18
-    elif _is_withdraw_rate:
-        return (steth_balance * 10**18) / beth_supply
-    elif steth_balance == 0:
-        return 10**18
-    else:
-        return (beth_supply * 10**18) / steth_balance
-
-
-@external
-@view
-def get_rate() -> uint256:
-    """
-    @dev How much bETH one receives for depositing one stETH, and how much bETH one needs
-         to provide to withdraw one stETH, 10**18 being the 1:1 rate.
-
-    This rate is notmally 10**18 (1:1) but might be different after severe penalties inflicted
-    on the Lido validators.
-    """
-    return self._get_rate(False)
+    
+    return (steth_balance * 10**18) / beth_supply
 
 
 @external
@@ -298,13 +241,12 @@ def withdraw(
     blockchain.
 
     The conversion rate from stETH to bETH should normally be 1 but might be different after
-    severe penalties inflicted on the Lido validators. You can obtain the current conversion
-    rate by calling `AnchorVault.get_rate()`.
+    severe penalties inflicted on the Lido validators.
     """
     self._assert_not_stopped()
     self._assert_version(_expected_version)
 
-    steth_rate: uint256 = self._get_rate(True)
+    steth_rate: uint256 = self._get_rate()
     Mintable(self.beth_token).burn(msg.sender, _beth_amount)
     steth_amount: uint256 = self._withdraw(_recipient, _beth_amount, steth_rate)
 

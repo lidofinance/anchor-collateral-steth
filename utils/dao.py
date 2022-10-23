@@ -46,14 +46,14 @@ def encode_proxy_upgrade(new_impl_address: str, setup_calldata: str) -> Tuple[st
         ]
     )
 
-def encode_bump_version() -> Tuple[str, str]:
+def encode_finalize_upgrade_v4() -> Tuple[str, str]:
     vault = AnchorVault.at(vault_proxy_addr)
 
     return agent_forward(
         [
             (
                 vault.address,
-                vault.bump_version.encode_input(),
+                vault.finalize_upgrade_v4.encode_input(),
             )
         ]
     )

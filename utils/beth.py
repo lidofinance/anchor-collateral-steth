@@ -1,7 +1,6 @@
 import csv
 
-CSV_DOWNLOADED_AT_BLOCK = 15767035
-BETH_BURNED = 4449999990000000000 + 439111118580000000000
+CSV_DOWNLOADED_AT_BLOCK = 15810700
 
 def import_beth_holders_from_csv():
     with open("beth-holders.csv") as csvfile:

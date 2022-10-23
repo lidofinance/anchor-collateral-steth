@@ -1,7 +1,6 @@
 import math
 import pytest
 import brownie
-from utils.beth import BETH_BURNED, beth_holders
 import utils.config as config
 
 TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
@@ -115,7 +114,6 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
     # simulate positive rebase and check withdrawal rate
     lido_oracle_report(steth_rebase_mult=1.01)
-    assert vault.get_rate() == 10**18
 
     # rewards are collectable
     vault.collect_rewards({"from": liquidations_admin})
@@ -296,7 +294,6 @@ def test_expected_withdrawal_rate_after_negative_rebase(
     )
 
     assert vault.version() == 3
-    assert vault.get_rate() == withdrawal_rate
 
     ####################
     # STAGE 2. Upgrade #
@@ -573,49 +570,3 @@ def test_minting_beth_from_steth_disabled(
 
     assert postupgrade_terra_beth_minted_to_stranger == 0, "no beth was minted"
     assert steth_minted_to_stranger_post_upgrade == 0, "no steth was minted"
-
-
-def test_withdraw_using_actual_holders(
-    accounts, steth_token, deploy_vault_and_pass_dao_vote, steth_approx_equal
-):
-    vault = brownie.Contract.from_abi(
-        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
-    )
-
-    beth_token = brownie.interface.ERC20(vault.beth_token())
-
-    deploy_vault_and_pass_dao_vote()
-
-    prev_total_supply = beth_token.totalSupply()
-    withdrawn = 0
-
-    for holder in beth_holders:
-        [holder_address, _, _] = holder
-
-        holder_account = accounts.at(holder_address, True)
-
-        # not using balances from csv, since they may change
-        prev_beth_balance = beth_token.balanceOf(holder_account)
-        prev_steth_balance = steth_token.balanceOf(holder_account)
-
-        is_wormhole = holder_account.address == config.wormhole_token_bridge_addr
-
-        withdraw_amount = prev_beth_balance
-
-        if is_wormhole:
-            withdraw_amount = prev_beth_balance - BETH_BURNED
-
-        vault.withdraw(
-            withdraw_amount, vault.version(), holder_account, {"from": holder_account}
-        )
-
-        withdrawn += withdraw_amount
-
-        assert beth_token.balanceOf(holder_account) == prev_beth_balance - withdraw_amount
-        assert steth_approx_equal(
-            steth_token.balanceOf(holder_account),
-            prev_steth_balance + withdraw_amount,
-        )
-
-    assert beth_token.totalSupply() == prev_total_supply - withdrawn
-    assert beth_token.totalSupply() == BETH_BURNED
