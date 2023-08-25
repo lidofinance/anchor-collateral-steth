@@ -1,6 +1,6 @@
 import csv
 
-CSV_DOWNLOADED_AT_BLOCK = 15810700
+CSV_DOWNLOADED_AT_BLOCK = 17965130
 
 def import_beth_holders_from_csv():
     with open("beth-holders.csv") as csvfile:

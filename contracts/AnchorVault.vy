@@ -97,7 +97,9 @@ def _assert_dao_governance(addr: address):
 @internal
 def _initialize_v4():
     self.version = 4
-    log VersionIncremented(4)
+    self.emergency_admin = ZERO_ADDRESS
+    log VersionIncremented(self.version)
+    log EmergencyAdminChanged(self.emergency_admin)
 
 
 @external
@@ -140,7 +142,7 @@ def petrify_impl():
 def emergency_stop():
     """
     @dev Performs emergency stop of the contract. Can only be called
-    by the current emergency admin or by the current admin.
+    by the current admin.
 
     While contract is in the stopped state, the following functions revert:
 
@@ -148,7 +150,7 @@ def emergency_stop():
 
     See `resume`, `set_emergency_admin`.
     """
-    assert msg.sender == self.emergency_admin or msg.sender == self.admin # dev: unauthorized
+    assert msg.sender == self.admin # dev: unauthorized
     self._assert_not_stopped()
     self.operations_allowed = False
     log OperationsStopped()
@@ -184,16 +186,11 @@ def change_admin(new_admin: address):
 @external
 def set_emergency_admin(new_emergency_admin: address):
     """
-    @dev Sets the address allowed to perform an emergency stop and having no other privileges.
-
-    Can only be called by the Lido DAO governance contract.
+    @dev Only Lido DAO can call the emergency_stop.
 
     See `emergency_stop`, `resume`.
     """
-    self._assert_dao_governance(msg.sender)
-    # we're explicitly allowing zero address
-    self.emergency_admin = new_emergency_admin
-    log EmergencyAdminChanged(new_emergency_admin)
+    raise "Set emergency admin is disabled"
 
 @internal
 @view
@@ -202,7 +199,7 @@ def _get_rate() -> uint256:
     beth_supply: uint256 = ERC20(self.beth_token).totalSupply() - self.total_beth_refunded
     if steth_balance >= beth_supply:
         return 10**18
-    
+
     return (steth_balance * 10**18) / beth_supply
 
 

@@ -1,5 +1,5 @@
 import sys
-from brownie import ZERO_ADDRESS
+from brownie import accounts
 from utils import config
 
 try:
@@ -28,8 +28,9 @@ def set_console_globals(**kwargs):
 
 
 def main():
-    deployer = config.get_deployer_account(config.get_is_live())
-    
+    # deployer = config.get_deployer_account(config.get_is_live())
+    deployer = accounts.at('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', force=True)
+
     print("Deployer:", deployer)
 
     sys.stdout.write("Proceed? [y/n]: ")
@@ -42,7 +43,7 @@ def main():
     anchor_new_vault = deploy(tx_params)
 
     print("Vault impl", anchor_new_vault)
-    
+
     # (vault_address, vote_id) = deploy_and_start_dao_vote(
     #     tx_params
     # )
@@ -77,10 +78,24 @@ def deploy_and_start_dao_vote(tx_params):
     return (anchor_new_vault, vote_id)
 
 
-def deploy(tx_params): 
+def deploy(tx_params):
     vault = AnchorVault.deploy(
         tx_params
     )
-    vault.petrify_impl()
+    vault.petrify_impl(tx_params)
 
     return vault
+
+def upgrade(new_address, tx_params):
+    vault_proxy_addr = '0xD7fE7881cD50fc155Bc310224352A812214e1E50'
+    calldata = b''
+    proxy = interface.AnchorVaultProxy(vault_proxy_addr)
+    proxy.proxy_upgradeTo(new_address, calldata, tx_params)
+
+    vault = AnchorVault.at(vault_proxy_addr)
+    vault.finalize_upgrade_v4(tx_params)
+
+def transfer():
+    acc1 = accounts.at('0xE3aa8298739DAa2dfa263BC6E0c2080655B0E368', True)
+    lido = interface.Lido('0xd40EefCFaB888C9159a61221def03bF77773FC19')
+    lido.transferFrom('0xE3aa8298739DAa2dfa263BC6E0c2080655B0E368', '0x78d6eeB8639C639316516DC004a311BF756C3640', 10000000000000000000, {'from': acc1 })

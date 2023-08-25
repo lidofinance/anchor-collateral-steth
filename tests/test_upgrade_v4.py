@@ -3,6 +3,9 @@ import pytest
 import brownie
 import utils.config as config
 
+from brownie import ZERO_ADDRESS
+from utils.helpers import ETH, _shares_rate_from_event
+
 TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 LIDO_DAO_FINANCE_MULTISIG = "0x48F300bD3C52c7dA6aAbDE4B683dEB27d38B9ABb"
 STETH_ERROR_MARGIN = 2
@@ -58,7 +61,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
 
         Stage 5. Rebase - simulate positive stETH rebase. The withdrawal rate only changes
         in case of a negative rebase, but we will still simulate a positive rebase
-        to better simulate an actual behaviour of the protocol.
+        to better simulate an actual behavior of the protocol.
 
         Stage 5. Withdraw - confirm that the user can withdraw their bETH worth of stETH
         that were minted on Terra before the upgrade. We will simulate the bridging of funds
@@ -113,7 +116,10 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     assert vault.version() == 3, "version matches"
 
     # simulate positive rebase and check withdrawal rate
-    lido_oracle_report(steth_rebase_mult=1.01)
+    tx = lido_oracle_report(cl_diff=ETH(1_000))
+
+    shares_rate_before, shares_rate_after = _shares_rate_from_event(tx)
+    assert shares_rate_after > shares_rate_before, "Shares rate has not increased"
 
     # rewards are collectable
     vault.collect_rewards({"from": liquidations_admin})
@@ -181,7 +187,10 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     # STAGE 5. Rebase #
     ###################
 
-    lido_oracle_report(steth_rebase_mult=1.01)
+    lido_oracle_report(cl_diff=ETH(1_000))
+
+    shares_rate_before, shares_rate_after = _shares_rate_from_event(tx)
+    assert shares_rate_after > shares_rate_before, "Shares rate has not increased"
 
     #####################
     # STAGE 6. Withdraw #
@@ -233,6 +242,7 @@ def test_expected_withdrawal_rate_after_negative_rebase(
     deploy_vault_and_pass_dao_vote,
     lido_oracle_report,
     deposit_amount,
+    lido,
 ):
     """
       This test confirms that the rate of stETH to bETH for withdrawal changes
@@ -327,7 +337,10 @@ def test_expected_withdrawal_rate_after_negative_rebase(
     # STAGE 4. Rebase #
     ###################
 
-    lido_oracle_report(steth_rebase_mult=0.9)
+    tx = lido_oracle_report(cl_diff=ETH(-1_000))
+
+    shares_rate_before, shares_rate_after = _shares_rate_from_event(tx)
+    assert shares_rate_after < shares_rate_before, "Shares rate has not decreased"
 
     #####################
     # STAGE 5. Withdraw #
@@ -366,6 +379,7 @@ def test_emergency_stop_works_as_expected(
     deploy_vault_and_pass_dao_vote,
     steth_approx_equal,
     lido_oracle_report,
+    lido_dao_agent
 ):
     ##################
     # STAGE 0. Setup #
@@ -408,6 +422,10 @@ def test_emergency_stop_works_as_expected(
     )
     assert preupgrade_terra_beth_minted_to_stranger > 0, "new beth were minted"
 
+    #set_emergency_admin working as well
+    vault.set_emergency_admin(stranger, {"from": lido_dao_agent})
+    assert vault.emergency_admin() == stranger
+
     ####################
     # STAGE 2. Upgrade #
     ####################
@@ -415,6 +433,11 @@ def test_emergency_stop_works_as_expected(
     # deploy a new vault implementation, start and enact DAO vote
     deploy_vault_and_pass_dao_vote()
     assert vault.version() == 4
+
+    #set_emergency_admin is disabled after the update
+    with brownie.reverts("Set emergency admin is disabled"):
+        vault.set_emergency_admin(stranger, {"from": lido_dao_agent})
+    assert vault.emergency_admin() == ZERO_ADDRESS
 
     #####################
     # STAGE 3. Bridging #
@@ -440,7 +463,10 @@ def test_emergency_stop_works_as_expected(
     # STAGE 4. Rebase #
     ###################
 
-    lido_oracle_report(steth_rebase_mult=1.01)
+    tx = lido_oracle_report(cl_diff=ETH(1_000))
+
+    shares_rate_before, shares_rate_after = _shares_rate_from_event(tx)
+    assert shares_rate_after > shares_rate_before, "Shares rate has not increased"
 
     # collect rewards does not work
     with brownie.reverts("Collect rewards stopped"):
@@ -450,7 +476,12 @@ def test_emergency_stop_works_as_expected(
     # STAGE 5. Stop #
     #################
 
-    vault.emergency_stop({"from": emergency_admin})
+    # remove emergency admin
+    with brownie.reverts():
+        vault.emergency_stop({"from": emergency_admin})
+
+    # only dao can stop the withdrawal
+    vault.emergency_stop({"from": dao_agent})
 
     # nope, doesn't work
     with brownie.reverts("Minting is closed"):

@@ -1,9 +1,11 @@
 import math
 import brownie
 import pytest
+import utils.config as config
+
 from brownie.network import web3
 from utils.beth import beth_holders, CSV_DOWNLOADED_AT_BLOCK
-import utils.config as config
+from utils.helpers import ETH
 
 STETH_ERROR_MARGIN = 2
 
@@ -16,14 +18,15 @@ def steth_approx_equal():
 
     return equal
 
-@pytest.mark.parametrize("rebase_coeff", [0, 1.01, 0.9])
+@pytest.mark.skip(reason="test working only at 17965130 block")
+@pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
 def test_withdraw_using_actual_holders(
     lido_oracle_report, rebase_coeff,
     accounts, steth_token, deploy_vault_and_pass_dao_vote, steth_approx_equal
 ):
     """
-    @dev Number of tokens that were burned after the incident the 2022-01-26 incident 
-         caused by incorrect address encoding produced by cached UI code after onchain 
+    @dev Number of tokens that were burned after the incident the 2022-01-26 incident
+         caused by incorrect address encoding produced by cached UI code after onchain
          migration to the Wormhole bridge.
     Tx 1: 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d
     bETH burned: 4449999990000000000
@@ -32,8 +35,7 @@ def test_withdraw_using_actual_holders(
     """
 
     #check block number for downloaded file
-    assert steth_approx_equal(web3.eth.block_number, CSV_DOWNLOADED_AT_BLOCK)
-
+    assert steth_approx_equal(web3.eth.block_number, CSV_DOWNLOADED_AT_BLOCK), "Invalid block number to check holders"
 
     BETH_BURNED = 4449999990000000000 + 439111118580000000000
 
@@ -43,17 +45,19 @@ def test_withdraw_using_actual_holders(
 
     beth_token = brownie.interface.ERC20(vault.beth_token())
 
+    before_vault_version = vault.version()
+
     deploy_vault_and_pass_dao_vote()
-    
+
     if rebase_coeff != 0:
-        lido_oracle_report(steth_rebase_mult=rebase_coeff)
+        lido_oracle_report(cl_diff=ETH(rebase_coeff))
 
     #vault balance
     steth_vault_balance = steth_token.balanceOf(vault.address)
     beth_total_supply = beth_token.totalSupply()
     total_beth_refunded = vault.total_beth_refunded()
     beth_balance = beth_total_supply - total_beth_refunded
-    
+
     #calculate withdrawal rate
     rate = 1
     if steth_vault_balance < beth_balance:
@@ -67,7 +71,6 @@ def test_withdraw_using_actual_holders(
     print('rate', rate)
     print('')
 
-
     prev_beth_total_supply = beth_token.totalSupply()
 
     withdrawn = 0
@@ -76,12 +79,13 @@ def test_withdraw_using_actual_holders(
     print("Total holders", len(beth_holders))
 
     ##current version
-    vault_version = vault.version()
+    after_vault_version = vault.version()
+    assert before_vault_version != after_vault_version, "version did not increased"
 
     i = 0
     for holder in beth_holders:
         i += 1
-        
+
         config.progress(i, count)
 
         [holder_address, _, _] = holder
@@ -100,7 +104,7 @@ def test_withdraw_using_actual_holders(
             withdraw_amount = prev_beth_balance - BETH_BURNED
 
         vault.withdraw(
-            withdraw_amount, vault_version, holder_account, {"from": holder_account}
+            withdraw_amount, after_vault_version, holder_account, {"from": holder_account}
         )
 
         withdrawn += withdraw_amount

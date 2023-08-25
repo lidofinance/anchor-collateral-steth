@@ -11,6 +11,8 @@ wormhole_addr = '0x98f3c9e6E3fAce36bAAd05FE09d375Ef1464288B'
 wormhole_token_bridge_addr = '0x3ee18B2214AFF97000D974cf647E7C347E8fa585'
 lido_dao_agent_address = '0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c'
 lido_dao_token_manager_address = '0xf73a1260d222f447210581DDf212D915c09a3249'
+lido_accounting_oracle = '0x852deD011285fe67063a08005c71a85690503Cee'
+lido_accounting_oracle_hash_consensus = '0xD624B08C83bAECF0807Dd2c6880C3154a5F0B288'
 
 # integration addresses
 vault_proxy_addr = '0xA2F987A546D4CD1c607Ee8141276876C26b72Bdf'

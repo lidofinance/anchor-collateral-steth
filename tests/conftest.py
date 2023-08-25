@@ -5,7 +5,9 @@ from scripts.deploy_v4 import deploy_and_start_dao_vote
 
 from utils.config import (
     ldo_vote_executors_for_tests,
-    lido_dao_voting_addr
+    lido_dao_voting_addr,
+    lido_accounting_oracle,
+    lido_accounting_oracle_hash_consensus
 )
 
 
@@ -116,6 +118,10 @@ def feed_ust_eth(interface):
 def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
 
+@pytest.fixture(scope='module')
+def hash_consensus_for_accounting_oracle(interface):
+    return interface.HashConsensus(lido_accounting_oracle_hash_consensus)
+
 
 @pytest.fixture(scope='module')
 def mock_bridge(accounts):
@@ -162,20 +168,40 @@ def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
     assert mock_bridge_connector.terra_beth_balance_of(terra_address) == terra_balance_before - amount
   return withdraw
 
+ONE_DAY = 1 * 24 * 60 * 60
 
 @pytest.fixture(scope='module')
-def lido_oracle_report(interface, accounts, steth_token):
+def lido_oracle_report(interface, accounts, steth_token, hash_consensus_for_accounting_oracle):
     lido = interface.Lido(steth_token.address)
-    lido_oracle = accounts.at(lido.getOracle(), force=True)
-    dao_voting = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
-    def report_beacon_state(steth_rebase_mult):
-        lido.setFee(0, {'from': dao_voting})
-        (deposited_validators, beacon_validators, beacon_balance) = lido.getBeaconStat()
-        total_supply = steth_token.totalSupply()
-        total_supply_inc = (steth_rebase_mult - 1) * total_supply
-        beacon_balance += total_supply_inc
-        assert beacon_balance > 0
-        lido.handleOracleReport(beacon_validators, beacon_balance, {'from': lido_oracle})
+    accounting_oracle = accounts.at(lido_accounting_oracle, force=True)
+
+    (refSlot, _) = hash_consensus_for_accounting_oracle.getCurrentFrame()
+    (_, SECONDS_PER_SLOT, GENESIS_TIME) = hash_consensus_for_accounting_oracle.getChainConfig()
+    reportTime = GENESIS_TIME + refSlot * SECONDS_PER_SLOT
+
+    (_, beaconValidators, beaconBalance) = lido.getBeaconStat()
+
+    withdrawalVaultBalance = 0
+    elRewardsVaultBalance = 0
+
+    def report_beacon_state(cl_diff):
+        postCLBalance = beaconBalance + cl_diff
+        postBeaconValidators = beaconValidators
+
+        assert beaconBalance > 0
+
+        return lido.handleOracleReport(
+            reportTime,
+            ONE_DAY,
+            postBeaconValidators,
+            postCLBalance,
+            withdrawalVaultBalance,
+            elRewardsVaultBalance,
+            0,
+            [],
+            0,
+            {"from": accounting_oracle.address}
+        )
     return report_beacon_state
 
 
