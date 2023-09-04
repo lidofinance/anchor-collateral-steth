@@ -164,7 +164,7 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     prev_beth_total_supply = beth_token.totalSupply()
     prev_steth_total_supply = steth_token.totalSupply()
 
-    with brownie.reverts("Minting is closed"):
+    with brownie.reverts("Minting is discontinued"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -422,9 +422,7 @@ def test_emergency_stop_works_as_expected(
     )
     assert preupgrade_terra_beth_minted_to_stranger > 0, "new beth were minted"
 
-    #set_emergency_admin working as well
-    vault.set_emergency_admin(stranger, {"from": lido_dao_agent})
-    assert vault.emergency_admin() == stranger
+    assert vault.emergency_admin() == emergency_admin
 
     ####################
     # STAGE 2. Upgrade #
@@ -434,9 +432,6 @@ def test_emergency_stop_works_as_expected(
     deploy_vault_and_pass_dao_vote()
     assert vault.version() == 4
 
-    #set_emergency_admin is disabled after the update
-    with brownie.reverts("Set emergency admin is disabled"):
-        vault.set_emergency_admin(stranger, {"from": lido_dao_agent})
     assert vault.emergency_admin() == ZERO_ADDRESS
 
     #####################
@@ -478,13 +473,13 @@ def test_emergency_stop_works_as_expected(
 
     # remove emergency admin
     with brownie.reverts():
-        vault.emergency_stop({"from": emergency_admin})
+        vault.pause({"from": emergency_admin})
 
     # only dao can stop the withdrawal
-    vault.emergency_stop({"from": dao_agent})
+    vault.pause({"from": dao_agent})
 
     # nope, doesn't work
-    with brownie.reverts("Minting is closed"):
+    with brownie.reverts("Minting is discontinued"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -520,7 +515,7 @@ def test_emergency_stop_works_as_expected(
     vault.resume({"from": dao_agent})
 
     # minting doesn't work
-    with brownie.reverts("Minting is closed"):
+    with brownie.reverts("Minting is discontinued"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,
@@ -585,7 +580,7 @@ def test_minting_beth_from_steth_disabled(
     prev_beth_total_supply = beth_token.totalSupply()
     prev_steth_total_supply = lido.totalSupply()
 
-    with brownie.reverts("Minting is closed"):
+    with brownie.reverts("Minting is discontinued"):
         vault.submit(
             deposit_amount,
             TERRA_ADDRESS,

@@ -1,3 +1,6 @@
+> **⚠️  Deprecation notice**: The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued. Withdrawals continue to work.
+More about [here](https://research.lido.fi/t/sunsetting-lido-on-terra/2367)
+
 # stETH as Anchor collateral
 
 This repo contains Ethereum contracts for integrating stETH as a collateral into the [Anchor protocol] in the form of bETH token. Currently it assumes the deployed [Wormhole v2 bridge] between Ethereum and Terra networks.

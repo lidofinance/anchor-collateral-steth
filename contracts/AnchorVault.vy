@@ -1,6 +1,8 @@
 # @version 0.2.12
 # @author skozin <info@lido.fi>
 # @licence MIT
+# @notice  The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued. Withdrawals continue to work.
+#          More about here https://research.lido.fi/t/sunsetting-lido-on-terra/2367
 from vyper.interfaces import ERC20
 
 interface Mintable:
@@ -139,7 +141,7 @@ def petrify_impl():
 
 
 @external
-def emergency_stop():
+def pause():
     """
     @dev Performs emergency stop of the contract. Can only be called
     by the current admin.
@@ -148,10 +150,10 @@ def emergency_stop():
 
     * `withdraw`
 
-    See `resume`, `set_emergency_admin`.
+    See `resume`.
     """
-    assert msg.sender == self.admin # dev: unauthorized
-    self._assert_not_stopped()
+    self._assert_dao_governance(msg.sender)
+    assert self.operations_allowed # dev: stopped
     self.operations_allowed = False
     log OperationsStopped()
 
@@ -162,7 +164,7 @@ def resume():
     @dev Resumes normal operations of the contract. Can only be called
     by the Lido DAO governance contract.
 
-    See `emergency_stop`.
+    See `pause`.
     """
     self._assert_dao_governance(msg.sender)
     assert not self.operations_allowed # dev: not stopped
@@ -181,16 +183,6 @@ def change_admin(new_admin: address):
     # we're explicitly allowing zero admin address for ossification
     self.admin = new_admin
     log AdminChanged(new_admin)
-
-
-@external
-def set_emergency_admin(new_emergency_admin: address):
-    """
-    @dev Only Lido DAO can call the emergency_stop.
-
-    See `emergency_stop`, `resume`.
-    """
-    raise "Set emergency admin is disabled"
 
 @internal
 @view
@@ -216,7 +208,7 @@ def submit(
 
     Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367.
     """
-    raise "Minting is closed"
+    raise "Minting is discontinued"
 
 @internal
 def _withdraw(recipient: address, beth_amount: uint256, steth_rate: uint256) -> uint256:
