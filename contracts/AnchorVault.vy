@@ -194,6 +194,16 @@ def _get_rate() -> uint256:
 
     return (steth_balance * 10**18) / beth_supply
 
+@external
+@view
+def get_rate() -> uint256:
+    """
+    @dev How much bETH one needs to provide to withdraw one stETH, 10**18 being the 1:1 rate.
+
+    This rate is normally 10**18 (1:1) but might be different after severe penalties inflicted
+    on the Lido validators.
+    """
+    return self._get_rate()
 
 @external
 @payable
