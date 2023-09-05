@@ -52,7 +52,7 @@ poetry cache clear --all pypi
 
 or try to update poetry
 ```shell
-poetry self update 1.1.8
+poetry self update 1.6
 ```
 
 ## Contracts
