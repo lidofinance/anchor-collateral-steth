@@ -50,6 +50,11 @@ Notes: if you have some problems on `poetry install` (too slow, or too long) try
 poetry cache clear --all pypi
 ```
 
+or try to update poetry
+```shell
+poetry self update 1.1.8
+```
+
 ## Contracts
 
 * [`bEth`](./contracts/bEth.vy) bETH token contract
