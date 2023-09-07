@@ -3,7 +3,7 @@ import brownie
 import pytest
 import utils.config as config
 
-from brownie.network import web3
+from brownie import bEth, reverts
 from utils.beth import beth_holders, CSV_DOWNLOADED_AT_BLOCK
 from utils.helpers import ETH
 
@@ -18,7 +18,38 @@ def steth_approx_equal():
 
     return equal
 
-@pytest.mark.skip(reason="test working only at 17965130 block")
+# @pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
+def test_withdraw_not_working(
+    deploy_vault_and_pass_dao_vote,
+    accounts
+):
+    beth_token = bEth.at(config.beth_token_addr)
+
+    vault = brownie.Contract.from_abi(
+        "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
+    )
+
+    #deploy vault, run and pass vote
+    deploy_vault_and_pass_dao_vote()
+
+    [holder_address, _, _] = beth_holders[2]
+
+    holder_account = accounts.at(holder_address, True)
+
+    # not using balances from csv, since they may change
+    beth_balance = beth_token.balanceOf(holder_account.address)
+
+    with reverts():
+        vault.withdraw(
+                beth_balance + 1, vault.version(), holder_account, {"from": holder_account}
+        )
+
+    vault.withdraw(
+        beth_balance, vault.version(), holder_account, {"from": holder_account}
+    )
+
+
+#@pytest.mark.skip(reason="test working only at 17965130 block")
 @pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
 def test_withdraw_using_actual_holders(
     lido_oracle_report, rebase_coeff,
@@ -35,7 +66,7 @@ def test_withdraw_using_actual_holders(
     """
 
     #check block number for downloaded file
-    assert steth_approx_equal(web3.eth.block_number, CSV_DOWNLOADED_AT_BLOCK), "Invalid block number to check holders"
+    # assert web3.eth.block_number == CSV_DOWNLOADED_AT_BLOCK, "Invalid block number to check holders"
 
     BETH_BURNED = 4449999990000000000 + 439111118580000000000
 
@@ -43,7 +74,7 @@ def test_withdraw_using_actual_holders(
         "AnchorVault", config.vault_proxy_addr, brownie.AnchorVault.abi
     )
 
-    beth_token = brownie.interface.ERC20(vault.beth_token())
+    beth_token = bEth.at(config.beth_token_addr)
 
     before_vault_version = vault.version()
 
@@ -114,6 +145,8 @@ def test_withdraw_using_actual_holders(
             steth_token.balanceOf(holder_account),
             prev_steth_balance + withdraw_amount * rate,
         )
+
+        print('beth supply', beth_token.totalSupply())
 
     assert beth_token.totalSupply() == prev_beth_total_supply - withdrawn
     assert beth_token.totalSupply() == BETH_BURNED

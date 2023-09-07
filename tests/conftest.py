@@ -1,15 +1,22 @@
 import pytest
-from brownie import ZERO_ADDRESS, chain
+from brownie import ZERO_ADDRESS, chain, interface
 
-from scripts.deploy_v4 import deploy_and_start_dao_vote
+from scripts.deploy import deploy
 
 from utils.config import (
     ldo_vote_executors_for_tests,
     lido_dao_voting_addr,
     lido_accounting_oracle,
-    lido_accounting_oracle_hash_consensus
+    lido_accounting_oracle_hash_consensus,
+    lido_dao_token_manager_address
 )
 
+from utils.dao import (
+    create_vote,
+    encode_proxy_upgrade,
+    encode_finalize_upgrade_v4,
+    encode_call_script
+)
 
 BETH_DECIMALS = 18
 UST_TOKEN = "0xa693B19d2931d498c5B318dF961919BB4aee87a5"
@@ -78,7 +85,6 @@ def another_stranger(accounts, deployer):
 def steth_token(interface):
     return interface.ERC20(STETH_TOKEN)
 
-
 @pytest.fixture(scope='module')
 def lido(interface, steth_token):
     return interface.Lido(steth_token.address)
@@ -88,32 +94,6 @@ def lido(interface, steth_token):
 def lido_dao_agent(accounts):
     return accounts.at('0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c', force=True)
 
-
-@pytest.fixture(scope='module')
-def ust_token(interface):
-    return interface.UST(UST_TOKEN)
-
-
-@pytest.fixture(scope='module')
-def usdc_token(interface):
-    return interface.USDC(USDC_TOKEN)
-
-
-@pytest.fixture(scope='module')
-def feed_steth_eth(interface):
-    return interface.Chainlink(CHAINLINK_STETH_ETH_FEED)
-
-
-@pytest.fixture(scope='module')
-def feed_usdc_eth(interface):
-    return interface.Chainlink(CHAINLINK_USDC_ETH_FEED)
-
-
-@pytest.fixture(scope='module')
-def feed_ust_eth(interface):
-    return interface.Chainlink(CHAINLINK_UST_ETH_FEED)
-
-
 @pytest.fixture(scope='module')
 def beth_token(deployer, admin, bEth):
     return bEth.deploy("bETH", ZERO_ADDRESS, admin, {'from': deployer})
@@ -122,16 +102,9 @@ def beth_token(deployer, admin, bEth):
 def hash_consensus_for_accounting_oracle(interface):
     return interface.HashConsensus(lido_accounting_oracle_hash_consensus)
 
-
 @pytest.fixture(scope='module')
 def mock_bridge(accounts):
     return accounts.add()
-
-
-@pytest.fixture(scope='module')
-def mock_wormhole_token_bridge(deployer, MockWormholeTokenBridge):
-    return MockWormholeTokenBridge.deploy({'from': deployer})
-
 
 @pytest.fixture(scope='module')
 def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector, interface, accounts):
@@ -145,19 +118,6 @@ def mock_bridge_connector(beth_token, deployer, mock_bridge, MockBridgeConnector
     assert ust_token.balanceOf(mock_bridge_connector) == ust_amount
 
     return mock_bridge_connector
-
-
-@pytest.fixture(scope='module')
-def mock_rewards_liquidator(MockRewardsLiquidator, deployer):
-    return MockRewardsLiquidator.deploy({'from': deployer})
-
-@pytest.fixture(scope='module')
-def mock_self_owned_steth_burner(MockSelfOwnedStETHBurner, deployer):
-    return MockSelfOwnedStETHBurner.deploy({'from': deployer})
-
-@pytest.fixture(scope='module')
-def mock_insurance_connector(mock_self_owned_steth_burner, deployer, InsuranceConnector):
-    return InsuranceConnector.deploy(mock_self_owned_steth_burner, {'from': deployer})
 
 @pytest.fixture(scope='module')
 def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
@@ -204,60 +164,6 @@ def lido_oracle_report(interface, accounts, steth_token, hash_consensus_for_acco
         )
     return report_beacon_state
 
-
-@pytest.fixture(scope="module")
-def steth_burner(lido, accounts, deployer, interface):
-    burner = accounts.add()
-    deployer.transfer(burner, 10**18)
-    voting_app = accounts.at('0x2e59A20f205bB85a89C53f1936454680651E618e', force=True)
-    acl = interface.ACL('0x9895F0F17cc1d1891b6f18ee0b483B6f221b37Bb')
-    acl.grantPermission(burner, lido, lido.BURN_ROLE(), {'from': voting_app})
-    return burner
-
-
-@pytest.fixture(scope="module")
-def burn_steth(steth_burner, lido):
-    def burn(holder, amount):
-        shares_amount = lido.getSharesByPooledEth(amount)
-        lido.burnShares(holder, shares_amount, {'from': steth_burner})
-    return burn
-
-
-@pytest.fixture(scope="module")
-def steth_adjusted_ammount(vault, mock_bridge_connector):
-    def adjust_amount(amount):
-        beth_rate = vault.get_rate()
-        beth_amount = int((amount * beth_rate) / 10**18)
-        beth_amount = mock_bridge_connector.adjust_amount(beth_amount, BETH_DECIMALS)
-        steth_amount_adj = int((beth_amount * 10**18) / beth_rate)
-        return steth_amount_adj
-    return adjust_amount
-
-
-@pytest.fixture(scope='module')
-def deposit_to_terra(vault, mock_bridge_connector, steth_token, helpers, steth_adjusted_ammount):
-    def deposit(terra_address, sender, amount):
-        terra_balance_before = mock_bridge_connector.terra_beth_balance_of(terra_address)
-        steth_balance_before = steth_token.balanceOf(sender)
-
-        steth_amount_adj = steth_adjusted_ammount(amount)
-
-        steth_token.approve(vault, amount, {'from': sender})
-        tx = vault.submit(amount, terra_address, '0xab', vault.version(), {'from': sender})
-
-        steth_balance_decrease = steth_balance_before - steth_token.balanceOf(sender)
-        assert helpers.equal_with_precision(steth_balance_decrease, steth_amount_adj, max_diff=10**10)
-
-        beth_amount = int(steth_balance_decrease * vault.get_rate() / 10**18)
-
-        assert helpers.equal_with_precision(
-            mock_bridge_connector.terra_beth_balance_of(terra_address),
-            terra_balance_before + beth_amount,
-            max_diff=100
-        )
-        return tx
-    return deposit
-
 @pytest.fixture(scope='module')
 def ldo_holder(accounts):
     return accounts.at('0xAD4f7415407B83a081A0Bee22D05A8FDC18B42da', force=True)
@@ -279,6 +185,7 @@ class Helpers:
         receiver_events = tx.events[evt_name]
         if source is not None:
             receiver_events = Helpers.filter_events_from(source, receiver_events)
+        print (receiver_events)
         assert len(receiver_events) == 1
         if evt_keys_dict is not None:
             assert dict(receiver_events[0]) == evt_keys_dict
@@ -330,23 +237,41 @@ class Helpers:
 
         print(f'vote {vote_id} executed')
 
-
-
 @pytest.fixture(scope='module')
 def helpers(accounts, dao_voting):
     Helpers.accounts = accounts
     Helpers.dao_voting = dao_voting
     return Helpers
 
+def deploy_and_start_dao_vote(tx_params):
+    voting = interface.Voting(lido_dao_voting_addr)
+    token_manager = interface.TokenManager(lido_dao_token_manager_address)
+
+    anchor_new_vault = deploy(tx_params)
+
+    evm_script = encode_call_script([
+        encode_proxy_upgrade(
+            new_impl_address=anchor_new_vault,
+            setup_calldata=b''
+        ),
+        encode_finalize_upgrade_v4()
+    ])
+
+    (vote_id, tx) = create_vote(
+        voting=voting,
+        token_manager=token_manager,
+        vote_desc=f"1. Update anchor vault implementation {anchor_new_vault}\n2. Increase vault version to v4",
+        evm_script=evm_script,
+        tx_params=tx_params
+    )
+
+    return (anchor_new_vault, vote_id)
+
 @pytest.fixture(scope='module')
 def deploy_vault_and_pass_dao_vote(ldo_holder, helpers):
     def deploy():
-        (vault, vote_id) = deploy_and_start_dao_vote(
-            {'from': ldo_holder}
-        )
-
+        (vault, vote_id) = deploy_and_start_dao_vote({'from': ldo_holder})
         helpers.pass_and_exec_dao_vote(vote_id)
-
         return vault
 
     return deploy
