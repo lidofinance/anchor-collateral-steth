@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "anchor-collateral-steth"
-version = "0.1.0"
+version = "4.0.0"
 description = "Repository for contains Ethereum contracts for integrating stETH as a collateral into the Anchor protocol."
 authors = ["Lido devteam"]
 license = "MIT"
