@@ -173,7 +173,7 @@ def petrify_impl():
 @external
 def pause():
     """
-    @dev Performs emergency stop of the contract. Can only be called
+    @dev Stops the operations of the contract. Can only be called
     by the current admin.
 
     While contract is in the stopped state, the following functions revert:
