@@ -6,6 +6,7 @@ import utils.config as config
 from brownie import ZERO_ADDRESS
 from utils.helpers import ETH, _shares_rate_from_event
 
+ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
 TERRA_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 LIDO_DAO_FINANCE_MULTISIG = "0x48F300bD3C52c7dA6aAbDE4B683dEB27d38B9ABb"
 STETH_ERROR_MARGIN = 2
@@ -138,14 +139,19 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     # check configuration
     assert config.vault_impl_addr != new_vault_implementation.address
     assert vault_proxy.implementation() == new_vault_implementation.address
-    assert vault.version() == 4
     assert vault.beth_token() == beth_token.address
     assert vault.steth_token() == steth_token
     assert vault.admin() == config.lido_dao_agent_address
-    assert vault.bridge_connector() == config.bridge_connector_addr
-    assert vault.rewards_liquidator() == config.rewards_liquidator_addr
-    assert vault.insurance_connector() == config.insurance_connector_addr
-    assert vault.liquidations_admin() == config.vault_liquidations_admin_addr
+    assert vault.version() == 4
+    assert vault.emergency_admin() == ZERO_ADDRESS
+    assert vault.bridge_connector() == ZERO_ADDRESS
+    assert vault.rewards_liquidator() == ZERO_ADDRESS
+    assert vault.insurance_connector() == ZERO_ADDRESS
+    assert vault.anchor_rewards_distributor() == ZERO_BYTES32
+    assert vault.liquidations_admin() == ZERO_ADDRESS
+    assert vault.no_liquidation_interval() == 0
+    assert vault.restricted_liquidation_interval() == 0
+
 
     #######################
     # STAGE 3. 2022/01/26 #

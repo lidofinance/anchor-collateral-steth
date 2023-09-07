@@ -35,6 +35,19 @@ def test_storage_slots(deploy_vault_and_pass_dao_vote):
     slots.append(to_32bytes(operations_allowed))                               #slot15 operations_allowed
     slots.append(to_32bytes(total_beth_refunded))                              #slot16 total_beth_refunded
 
+    #slots which we are change during the upgrade
+    new_slots = {
+        3: { 'old': slots[3], 'new': to_32bytes(HexBytes('0x')) },
+        4: { 'old': slots[4], 'new': to_32bytes(HexBytes('0x')) },
+        5: { 'old': slots[5], 'new': to_32bytes(HexBytes('0x')) },
+        6: { 'old': slots[6], 'new': to_32bytes(HexBytes('0x')) },
+        7: { 'old': slots[7], 'new': to_32bytes(HexBytes('0x')) },
+        8: { 'old': slots[8], 'new': to_32bytes(HexBytes('0x')) },
+        9: { 'old': slots[9], 'new': to_32bytes(HexBytes('0x')) },
+        13: {'old': slots[13], 'new': to_32bytes(HexBytes(4)) },
+        14: {'old': slots[14], 'new': to_32bytes(HexBytes('0x'))}
+    }
+
     #save previous storage slots
     prev_slots = []
     for index, slot in enumerate(slots):
@@ -50,15 +63,10 @@ def test_storage_slots(deploy_vault_and_pass_dao_vote):
     for index, slot in enumerate(prev_slots):
         data = web3.eth.get_storage_at(config.vault_proxy_addr, index)
 
-        #we will change 2 slots after upgrade
-        # - version
-        # - emergency_admin
-        if index == 13:
-            assert slot == to_32bytes(HexBytes(3)) #previous version == 3
-            assert data == to_32bytes(HexBytes(4)) #new version == 4
-        elif index == 14:
-            assert slot == to_32bytes(HexBytes(config.dev_multisig_addr)) #previous emergency_admin is dev multisig
-            assert data == to_32bytes(HexBytes('0x'))
+        #we will change  slots after upgrade
+        if index in list(new_slots.keys()):
+            assert slot == new_slots[index]['old']
+            assert data == new_slots[index]['new']
         else:
              #check previous value
             assert data == slot, "invalid previous slot after upgrade"

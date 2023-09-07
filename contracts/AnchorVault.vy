@@ -5,7 +5,7 @@
 #          More about here https://research.lido.fi/t/sunsetting-lido-on-terra/2367
 from vyper.interfaces import ERC20
 
-interface Mintable:
+interface Burnable:
     def burn(owner: address, amount: uint256): nonpayable
 
 interface Lido:
@@ -21,6 +21,23 @@ event AdminChanged:
 
 event EmergencyAdminChanged:
     new_emergency_admin: address
+
+event BridgeConnectorUpdated:
+    bridge_connector: address
+
+event RewardsLiquidatorUpdated:
+    rewards_liquidator: address
+
+event InsuranceConnectorUpdated:
+    insurance_connector: address
+
+event LiquidationConfigUpdated:
+    liquidations_admin: address
+    no_liquidation_interval: uint256
+    restricted_liquidation_interval: uint256
+
+event AnchorRewardsDistributorUpdated:
+    anchor_rewards_distributor: bytes32
 
 event VersionIncremented:
     new_version: uint256
@@ -100,8 +117,25 @@ def _assert_dao_governance(addr: address):
 def _initialize_v4():
     self.version = 4
     self.emergency_admin = ZERO_ADDRESS
+    self.bridge_connector = ZERO_ADDRESS
+    self.rewards_liquidator = ZERO_ADDRESS
+    self.insurance_connector = ZERO_ADDRESS
+    self.anchor_rewards_distributor = empty(bytes32)
+    self.liquidations_admin = ZERO_ADDRESS
+    self.no_liquidation_interval = 0
+    self.restricted_liquidation_interval = 0
+
     log VersionIncremented(self.version)
     log EmergencyAdminChanged(self.emergency_admin)
+    log BridgeConnectorUpdated(self.bridge_connector)
+    log RewardsLiquidatorUpdated(self.rewards_liquidator)
+    log InsuranceConnectorUpdated(self.insurance_connector)
+    log AnchorRewardsDistributorUpdated(self.anchor_rewards_distributor)
+    log LiquidationConfigUpdated(
+        self.liquidations_admin,
+        self.no_liquidation_interval,
+        self.restricted_liquidation_interval
+    )
 
 
 @external
@@ -120,11 +154,7 @@ def initialize(beth_token: address, steth_token: address, admin: address, emerge
     self.admin = admin
     self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
 
-    ## version 3
-    self.emergency_admin = emergency_admin
-    log EmergencyAdminChanged(emergency_admin)
-    self.version = 3
-    log VersionIncremented(3)
+    ## version 3 init skipped as being superseded by version 4 init
 
     self._initialize_v4()
 
@@ -246,7 +276,7 @@ def withdraw(
     self._assert_version(_expected_version)
 
     steth_rate: uint256 = self._get_rate()
-    Mintable(self.beth_token).burn(msg.sender, _beth_amount)
+    Burnable(self.beth_token).burn(msg.sender, _beth_amount)
     steth_amount: uint256 = self._withdraw(_recipient, _beth_amount, steth_rate)
 
     log Withdrawn(_recipient, _beth_amount, steth_amount)

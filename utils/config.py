@@ -54,8 +54,7 @@ def get_deployer_account(is_live):
             "Please set DEPLOYER env variable to the deployer account name"
         )
 
-    return accounts.load(os.environ['DEPLOYER']) if is_live else accounts.at(
-        ldo_vote_executors_for_tests[0], force=True)
+    return accounts.load(os.environ['DEPLOYER']) if is_live else accounts[0]
 
 
 def get_env(name, is_required=True, message=None, default=None):
