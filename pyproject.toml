@@ -5,7 +5,7 @@ description = "Repository for contains Ethereum contracts for integrating stETH 
 authors = ["Lido devteam"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://mainnet.lido.fi"
+homepage = "https://lido.fi"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
