@@ -1,7 +1,8 @@
 # @version 0.2.12
 # @author skozin <info@lido.fi>
 # @licence MIT
-# @notice  The Lido DAO stops maintaining the Anchor <> stETH integration. Minting and rewards distribution are discontinued. Withdrawals continue to work.
+# @notice  The Lido DAO stops maintaining the Anchor <> stETH integration. Minting and rewards distribution are discontinued.
+#          Withdrawals continue to work.
 #          More about here https://research.lido.fi/t/sunsetting-lido-on-terra/2367
 from vyper.interfaces import ERC20
 
@@ -244,7 +245,7 @@ def submit(
     _expected_version: uint256
 ) -> (uint256, uint256):
     """
-    @dev The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued.
+    @dev The Lido DAO stops maintaining the Anchor <> stETH integration. Minting and rewards distribution are discontinued.
          Withdrawals continue to work.
 
     Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367.
@@ -298,7 +299,7 @@ def finalize_upgrade_v4():
 @external
 def collect_rewards() -> uint256:
     """
-    @dev The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued.
+    @dev The Lido DAO stops maintaining the Anchor <> stETH integration. Minting and rewards distribution are discontinued.
          Withdrawals continue to work.
     """
     raise "Collect rewards stopped"
