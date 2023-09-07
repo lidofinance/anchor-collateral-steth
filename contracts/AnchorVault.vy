@@ -244,7 +244,8 @@ def submit(
     _expected_version: uint256
 ) -> (uint256, uint256):
     """
-    @dev Lido stopped maintaining the Anchor <> stETH integration.
+    @dev The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued.
+         Withdrawals continue to work.
 
     Context: https://research.lido.fi/t/sunsetting-lido-on-terra/2367.
     """
@@ -297,6 +298,7 @@ def finalize_upgrade_v4():
 @external
 def collect_rewards() -> uint256:
     """
-    @dev Lido stopped maintaining the Anchor <> stETH integration.
+    @dev The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued.
+         Withdrawals continue to work.
     """
     raise "Collect rewards stopped"
