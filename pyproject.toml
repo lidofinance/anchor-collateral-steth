@@ -2,7 +2,7 @@
 name = "anchor-collateral-steth"
 version = "4.0.0"
 description = "Repository for contains Ethereum contracts for integrating stETH as a collateral into the Anchor protocol."
-authors = ["Lido devteam"]
+authors = ["Lido DAO contributors"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://lido.fi"
