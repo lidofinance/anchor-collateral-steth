@@ -1,4 +1,4 @@
-> **⚠️  Deprecation notice**: The Lido stops maintaining the Anchor - stETH integration. Minting is discontinued. Withdrawals continue to work.
+> **⚠️  Deprecation notice**: The Lido DAO stops maintaining the Anchor <> stETH integration. Minting and rewards distribution are discontinued. Withdrawals continue to work.
 More about [here](https://research.lido.fi/t/sunsetting-lido-on-terra/2367)
 
 # stETH as Anchor collateral
