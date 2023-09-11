@@ -24,9 +24,15 @@ def main():
         print("Aborting")
         return
 
-    tx_params = {"from": deployer, "max_fee": "100 gwei", "priority_fee": "2 gwei"}
+    tx_params = {"from": deployer}
+
+    if config.get_is_live():
+        tx_params["priority_fee"] = "2 gwei"
+
     anchor_new_vault = deploy(tx_params)
-    print("Vault impl", anchor_new_vault)
+
+    print("Vault address\t", anchor_new_vault)
+    print("Vault petrified\t", anchor_new_vault.version() == 2**256-1)
 
 def deploy(tx_params):
     vault = AnchorVault.deploy(tx_params)

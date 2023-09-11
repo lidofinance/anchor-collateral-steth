@@ -3,7 +3,6 @@ from brownie import ZERO_ADDRESS, Contract, reverts
 
 from test_vault import vault
 
-
 @pytest.fixture(scope='function')
 def proxy(vault, AnchorVaultProxy):
     return Contract.from_abi('AnchorVaultProxy', vault.address, AnchorVaultProxy.abi)

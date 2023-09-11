@@ -49,9 +49,6 @@ event OperationsStopped:
 event OperationsResumed:
     pass
 
-# Aragon Agent contract of the Lido DAO
-LIDO_DAO_AGENT: constant(address) = 0x3e40D73EB977Dc6a537aF587D48316feE66E9C8c
-
 # WARNING: since this contract is behind a proxy, don't change the order of the variables
 # and don't remove variables during the code upgrades. You can only append new variables
 # to the end of the list.
@@ -109,11 +106,6 @@ def _assert_not_stopped():
 def _assert_admin(addr: address):
     assert addr == self.admin # dev: unauthorized
 
-
-@internal
-def _assert_dao_governance(addr: address):
-    assert addr == LIDO_DAO_AGENT # dev: unauthorized
-
 @internal
 def _initialize_v4():
     self.version = 4
@@ -140,7 +132,7 @@ def _initialize_v4():
 
 
 @external
-def initialize(beth_token: address, steth_token: address, admin: address, emergency_admin: address):
+def initialize(beth_token: address, steth_token: address, admin: address):
     assert self.beth_token == ZERO_ADDRESS # dev: already initialized
     assert self.version == 0 # dev: already initialized
 
@@ -175,7 +167,7 @@ def petrify_impl():
 def pause():
     """
     @dev Stops the operations of the contract. Can only be called
-    by the current admin.
+    by the Lido DAO governance contract.
 
     While contract is in the stopped state, the following functions revert:
 
@@ -183,7 +175,7 @@ def pause():
 
     See `resume`.
     """
-    self._assert_dao_governance(msg.sender)
+    self._assert_admin(msg.sender)
     assert self.operations_allowed # dev: stopped
     self.operations_allowed = False
     log OperationsStopped()
@@ -197,7 +189,7 @@ def resume():
 
     See `pause`.
     """
-    self._assert_dao_governance(msg.sender)
+    self._assert_admin(msg.sender)
     assert not self.operations_allowed # dev: not stopped
     self.operations_allowed = True
     log OperationsResumed()

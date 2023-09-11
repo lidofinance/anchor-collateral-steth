@@ -1,7 +1,5 @@
 import pytest
 from brownie import ZERO_ADDRESS, reverts
-from time import time
-
 
 @pytest.fixture(scope='module')
 def beth_minter(beth_token, admin, accounts):
@@ -24,7 +22,7 @@ def test_configure(beth_token, stranger, admin, helpers):
 
     with reverts():
         beth_token.set_minter(stranger, {"from": stranger})
-    
+
     tx = beth_token.change_admin(stranger, {"from": admin})
     helpers.assert_single_event_named('AdminChanged', tx, source=beth_token, evt_keys_dict = {
         "new_admin": stranger
@@ -78,10 +76,10 @@ def test_transfer(beth_token, vault_user, beth_minter, stranger, helpers):
     amount = 10**18
 
     tx = beth_token.mint(vault_user, amount, {"from": beth_minter})
-    
+
     with reverts():
         beth_token.transfer(ZERO_ADDRESS, amount, {"from": vault_user})
-    
+
     with reverts():
         beth_token.transfer(beth_token, amount, {"from": vault_user})
 
@@ -116,7 +114,7 @@ def test_transfer_from(beth_token, vault_user, beth_minter, stranger, helpers):
         "value": amount
     })
     helpers.assert_no_events_named('Approval', tx)
-    
+
 
     tx = beth_token.approve(stranger, 2**256-1, {"from": vault_user})
     stranger_beth_balance_before = beth_token.balanceOf(stranger)

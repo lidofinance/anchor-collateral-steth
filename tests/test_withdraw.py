@@ -49,7 +49,7 @@ def test_withdraw_not_working(
     )
 
 
-#@pytest.mark.skip(reason="test working only at 17965130 block")
+@pytest.mark.skip(reason="test working only at 17965130 block")
 @pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
 def test_withdraw_using_actual_holders(
     lido_oracle_report, rebase_coeff,
@@ -145,8 +145,6 @@ def test_withdraw_using_actual_holders(
             steth_token.balanceOf(holder_account),
             prev_steth_balance + withdraw_amount * rate,
         )
-
-        print('beth supply', beth_token.totalSupply())
 
     assert beth_token.totalSupply() == prev_beth_total_supply - withdrawn
     assert beth_token.totalSupply() == BETH_BURNED

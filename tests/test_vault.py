@@ -20,7 +20,6 @@ def deploy_and_initialize_vault(
     deployer,
     stranger,
     admin,
-    emergency_admin,
     lido_dao_agent,
     AnchorVault,
     AnchorVaultProxy,
@@ -34,18 +33,18 @@ def deploy_and_initialize_vault(
     assert impl.steth_token() == ZERO_ADDRESS
 
     with reverts('dev: already initialized'):
-        impl.initialize(beth_token, steth_token, stranger, stranger, {'from': stranger})
+        impl.initialize(beth_token, steth_token, stranger, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        impl.initialize(beth_token, steth_token, deployer, deployer, {'from': deployer})
+        impl.initialize(beth_token, steth_token, deployer, {'from': deployer})
 
     proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
     vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
-    tx = vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': stranger})
+    tx = vault.initialize(beth_token, steth_token, lido_dao_agent, {'from': stranger})
 
     helpers.assert_single_event_named('AdminChanged', tx, source=vault, evt_keys_dict={
-        'new_admin': admin
+        'new_admin': lido_dao_agent
     })
 
     helpers.assert_single_event_named('EmergencyAdminChanged', tx, source=vault, evt_keys_dict={
@@ -74,7 +73,6 @@ def vault(
     deployer,
     stranger,
     admin,
-    emergency_admin,
     lido_dao_agent,
     AnchorVault,
     AnchorVaultProxy,
@@ -87,25 +85,25 @@ def vault(
 def test_init_cannot_be_called_twice(beth_token, steth_token, deployer, admin, stranger, AnchorVault):
     vault = AnchorVault.deploy({'from': deployer})
 
-    vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
+    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
+        vault.initialize(beth_token, steth_token, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, admin, {'from': deployer})
+        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, admin, admin, {'from': admin})
+        vault.initialize(beth_token, steth_token, admin, {'from': admin})
 
 def test_init_fails_on_zero_token_address(beth_token, steth_token, deployer, admin, AnchorVault):
     vault = AnchorVault.deploy({'from': deployer})
 
     with reverts('dev: invalid bETH address'):
-        vault.initialize(ZERO_ADDRESS, steth_token, admin, admin, {'from': deployer})
+        vault.initialize(ZERO_ADDRESS, steth_token, admin, {'from': deployer})
 
     with reverts('dev: invalid stETH address'):
-        vault.initialize(beth_token, ZERO_ADDRESS, admin, admin, {'from': deployer})
+        vault.initialize(beth_token, ZERO_ADDRESS, admin, {'from': deployer})
 
 def test_init_fails_on_non_zero_beth_total_supply(
     beth_token,
@@ -120,7 +118,7 @@ def test_init_fails_on_non_zero_beth_total_supply(
     vault = AnchorVault.deploy({'from': deployer})
 
     with reverts('dev: non-zero bETH total supply'):
-        vault.initialize(beth_token, steth_token, admin, admin, {'from': deployer})
+        vault.initialize(beth_token, steth_token, admin, {'from': deployer})
 
 
 def test_initialized_vault_cannot_be_petrified(
@@ -132,7 +130,7 @@ def test_initialized_vault_cannot_be_petrified(
     AnchorVault
 ):
     vault = AnchorVault.deploy({'from': deployer})
-    vault.initialize(beth_token, steth_token, admin, admin, {'from': stranger})
+    vault.initialize(beth_token, steth_token, admin, {'from': stranger})
 
     with reverts('dev: already initialized'):
         vault.petrify_impl({'from': stranger})
@@ -154,36 +152,17 @@ def test_petrified_vault_cannot_be_initialized(
     vault.petrify_impl({'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, stranger, stranger, {'from': stranger})
+        vault.initialize(beth_token, steth_token, stranger, {'from': stranger})
 
     with reverts('dev: already initialized'):
-        vault.initialize(beth_token, steth_token, deployer, deployer, {'from': deployer})
-
-@pytest.fixture(scope='function')
-def vault_no_proxy(
-    beth_token,
-    steth_token,
-    deployer,
-    admin,
-    emergency_admin,
-    lido_dao_agent,
-    AnchorVault
-):
-    vault = AnchorVault.deploy({'from': deployer})
-
-    vault.initialize(beth_token, steth_token, admin, emergency_admin, {'from': deployer})
-
-    beth_token.set_minter(vault, {'from': admin})
-    resume_vault(vault, lido_dao_agent)
-
-    return vault
+        vault.initialize(beth_token, steth_token, deployer, {'from': deployer})
 
 def test_initial_config_correct(
     vault,
-    admin,
-    beth_token
+    beth_token,
+    lido_dao_agent
 ):
-    assert vault.admin() == admin
+    assert vault.admin() == lido_dao_agent
     assert vault.emergency_admin() == ZERO_ADDRESS
     assert vault.version() == VAULT_VERSION
     assert vault.beth_token() == beth_token
@@ -195,9 +174,9 @@ def test_initial_config_correct(
     assert vault.no_liquidation_interval() == 0
     assert vault.restricted_liquidation_interval() == 0
 
-def test_finalize_upgrade_v4_cannot_be_called_on_v4_vault(vault, admin):
+def test_finalize_upgrade_v4_cannot_be_called_on_v4_vault(vault, lido_dao_agent):
     with reverts('unexpected contract version'):
-        vault.finalize_upgrade_v4({'from': admin})
+        vault.finalize_upgrade_v4({'from': lido_dao_agent})
 
 @pytest.mark.parametrize('amount', [1 * 10**18, 1 * 10**18 + 10])
 def test_deposit_closed(
@@ -208,11 +187,14 @@ def test_deposit_closed(
     with reverts("Minting is discontinued"):
         vault.submit(amount, TERRA_ADDRESS, '0xab', vault.version(), {'from': vault_user})
 
-def test_change_admin(vault, stranger, admin, helpers):
+def test_change_admin(vault, stranger, admin, helpers, lido_dao_agent):
     with reverts():
         vault.change_admin(stranger, {"from": stranger})
 
-    tx = vault.change_admin(stranger, {"from": admin})
+    with reverts():
+        tx = vault.change_admin(stranger, {"from": admin})
+
+    tx = vault.change_admin(stranger, {"from": lido_dao_agent})
 
     helpers.assert_single_event_named('AdminChanged', tx, source=vault, evt_keys_dict={
         'new_admin': stranger

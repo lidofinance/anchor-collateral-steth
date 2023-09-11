@@ -130,6 +130,12 @@ def withdraw_from_terra(mock_bridge_connector, mock_bridge, beth_token):
 
 ONE_DAY = 1 * 24 * 60 * 60
 
+"""
+The mechanism of oracles in Lido V2 has changed. Now AccountingOracle has push data changes on each report.
+
+We use a simple version of `simulate_report` from here:
+https://github.com/lidofinance/scripts/blob/master/utils/test/oracle_report_helpers.py#L239
+"""
 @pytest.fixture(scope='module')
 def lido_oracle_report(interface, accounts, steth_token, hash_consensus_for_accounting_oracle):
     lido = interface.Lido(steth_token.address)
