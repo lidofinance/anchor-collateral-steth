@@ -167,7 +167,7 @@ def petrify_impl():
 def pause():
     """
     @dev Stops the operations of the contract. Can only be called
-    by the Lido DAO governance contract.
+    by the contract's admin.
 
     While contract is in the stopped state, the following functions revert:
 
