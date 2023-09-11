@@ -185,7 +185,7 @@ def pause():
 def resume():
     """
     @dev Resumes normal operations of the contract. Can only be called
-    by the Lido DAO governance contract.
+    by the contract' admin.
 
     See `pause`.
     """
