@@ -106,62 +106,11 @@ def _assert_not_stopped():
 def _assert_admin(addr: address):
     assert addr == self.admin # dev: unauthorized
 
-@internal
-def _initialize_v4():
-    self.version = 4
-    self.emergency_admin = ZERO_ADDRESS
-    self.bridge_connector = ZERO_ADDRESS
-    self.rewards_liquidator = ZERO_ADDRESS
-    self.insurance_connector = ZERO_ADDRESS
-    self.anchor_rewards_distributor = empty(bytes32)
-    self.liquidations_admin = ZERO_ADDRESS
-    self.no_liquidation_interval = 0
-    self.restricted_liquidation_interval = 0
-
-    log VersionIncremented(self.version)
-    log EmergencyAdminChanged(self.emergency_admin)
-    log BridgeConnectorUpdated(self.bridge_connector)
-    log RewardsLiquidatorUpdated(self.rewards_liquidator)
-    log InsuranceConnectorUpdated(self.insurance_connector)
-    log AnchorRewardsDistributorUpdated(self.anchor_rewards_distributor)
-    log LiquidationConfigUpdated(
-        self.liquidations_admin,
-        self.no_liquidation_interval,
-        self.restricted_liquidation_interval
-    )
-
-
 @external
-def initialize(beth_token: address, steth_token: address, admin: address):
-    assert self.beth_token == ZERO_ADDRESS # dev: already initialized
-    assert self.version == 0 # dev: already initialized
-
-    assert beth_token != ZERO_ADDRESS # dev: invalid bETH address
-    assert steth_token != ZERO_ADDRESS # dev: invalid stETH address
-
-    assert ERC20(beth_token).totalSupply() == 0 # dev: non-zero bETH total supply
-
-    self.beth_token = beth_token
-    self.steth_token = steth_token
-    # we're explicitly allowing zero admin address for ossification
-    self.admin = admin
-    self.last_liquidation_share_price = Lido(steth_token).getPooledEthByShares(10**18)
-
-    ## version 3 init skipped as being superseded by version 4 init
-
-    self._initialize_v4()
-
-    log AdminChanged(admin)
-
-
-@external
-def petrify_impl():
-    """
-    @dev Prevents initialization of an implementation sitting behind a proxy.
-    """
+def __init__():
+    # dev: Prevents initialization of an implementation sitting behind a proxy.
     assert self.version == 0 # dev: already initialized
     self.version = MAX_UINT256
-
 
 @external
 def pause():
@@ -286,7 +235,32 @@ def finalize_upgrade_v4():
     """
     self._assert_admin(msg.sender)
     self._assert_version(3)
-    self._initialize_v4()
+
+    self.version = 4
+    self.emergency_admin = ZERO_ADDRESS
+    self.bridge_connector = ZERO_ADDRESS
+    self.rewards_liquidator = ZERO_ADDRESS
+    self.insurance_connector = ZERO_ADDRESS
+    self.anchor_rewards_distributor = empty(bytes32)
+    self.liquidations_admin = ZERO_ADDRESS
+    self.no_liquidation_interval = 0
+    self.restricted_liquidation_interval = 0
+
+    self.last_liquidation_time = 0
+    self.last_liquidation_share_price = 0
+    self.last_liquidation_shares_burnt = 0
+
+    log VersionIncremented(4)
+    log EmergencyAdminChanged(ZERO_ADDRESS)
+    log BridgeConnectorUpdated(ZERO_ADDRESS)
+    log RewardsLiquidatorUpdated(ZERO_ADDRESS)
+    log InsuranceConnectorUpdated(ZERO_ADDRESS)
+    log AnchorRewardsDistributorUpdated(empty(bytes32))
+    log LiquidationConfigUpdated(
+        ZERO_ADDRESS,
+        0,
+        0
+    )
 
 @external
 def collect_rewards() -> uint256:

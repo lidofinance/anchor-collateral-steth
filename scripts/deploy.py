@@ -39,5 +39,4 @@ def main():
 
 def deploy(tx_params, publish_source=False):
     vault = AnchorVault.deploy(tx_params, publish_source=publish_source)
-    vault.petrify_impl(tx_params)
     return vault

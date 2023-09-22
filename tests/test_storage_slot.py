@@ -44,6 +44,9 @@ def test_storage_slots(deploy_vault_and_pass_dao_vote):
         7: { 'old': slots[7], 'new': to_32bytes(HexBytes('0x')) },
         8: { 'old': slots[8], 'new': to_32bytes(HexBytes('0x')) },
         9: { 'old': slots[9], 'new': to_32bytes(HexBytes('0x')) },
+        10: { 'old': slots[10], 'new': to_32bytes(HexBytes('0x')) },
+        11: { 'old': slots[11], 'new': to_32bytes(HexBytes('0x')) },
+        12: { 'old': slots[12], 'new': to_32bytes(HexBytes('0x')) },
         13: {'old': slots[13], 'new': to_32bytes(HexBytes(4)) },
         14: {'old': slots[14], 'new': to_32bytes(HexBytes('0x'))}
     }

@@ -3,7 +3,7 @@ import pytest
 import brownie
 import utils.config as config
 
-from brownie import ZERO_ADDRESS
+from brownie import ZERO_ADDRESS, reverts
 from utils.helpers import ETH, _shares_rate_from_event
 
 ZERO_BYTES32 = '0x0000000000000000000000000000000000000000000000000000000000000000'
@@ -20,6 +20,7 @@ def steth_approx_equal():
         )
 
     return equal
+
 
 
 @pytest.mark.parametrize("deposit_amount", [10 * 10**18])
@@ -151,6 +152,9 @@ def test_minting_disabled_but_preupgrade_beth_are_withdrawable(
     assert vault.liquidations_admin() == ZERO_ADDRESS
     assert vault.no_liquidation_interval() == 0
     assert vault.restricted_liquidation_interval() == 0
+    assert vault.last_liquidation_time() == 0
+    assert vault.last_liquidation_share_price() == 0
+    assert vault.last_liquidation_shares_burnt() == 0
 
 
     #######################
