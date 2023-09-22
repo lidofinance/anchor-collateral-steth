@@ -18,7 +18,6 @@ def steth_approx_equal():
 
     return equal
 
-# @pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
 def test_withdraw_not_working(
     deploy_vault_and_pass_dao_vote,
     accounts
