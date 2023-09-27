@@ -12,10 +12,30 @@ interface Burnable:
 interface Lido:
     def getPooledEthByShares(shares_amount: uint256) -> uint256: view
 
+event Deposited:
+    sender: indexed(address)
+    amount: uint256
+    terra_address: bytes32
+    beth_amount_received: uint256
+
 event Withdrawn:
     recipient: indexed(address)
     amount: uint256
     steth_amount_received: uint256
+
+event Refunded:
+    recipient: indexed(address)
+    beth_amount: uint256
+    steth_amount: uint256
+    comment: String[1024]
+
+event RefundedBethBurned:
+    beth_amount: uint256
+
+
+event RewardsCollected:
+    steth_amount: uint256
+    ust_amount: uint256
 
 event AdminChanged:
     new_admin: address
@@ -96,12 +116,6 @@ total_beth_refunded: public(uint256)
 def _assert_version(_expected_version: uint256):
     assert _expected_version == self.version, "unexpected contract version"
 
-
-@internal
-def _assert_not_stopped():
-    assert self.operations_allowed, "contract stopped"
-
-
 @internal
 def _assert_admin(addr: address):
     assert addr == self.admin # dev: unauthorized
@@ -116,7 +130,7 @@ def __init__():
 def pause():
     """
     @dev Stops the operations of the contract. Can only be called
-    by the contract's admin.
+    by the contract' admin.
 
     While contract is in the stopped state, the following functions revert:
 
@@ -128,7 +142,6 @@ def pause():
     assert self.operations_allowed # dev: stopped
     self.operations_allowed = False
     log OperationsStopped()
-
 
 @external
 def resume():
@@ -143,11 +156,10 @@ def resume():
     self.operations_allowed = True
     log OperationsResumed()
 
-
 @external
 def change_admin(new_admin: address):
     """
-    @dev Changes the admin address. Can only be called by the current admin address.
+    @dev Changes the admin address. Can only be called by the contract' admin.
 
     Setting the admin to zero ossifies the contract, i.e. makes it irreversibly non-administrable.
     """
@@ -215,7 +227,7 @@ def withdraw(
     The conversion rate from stETH to bETH should normally be 1 but might be different after
     severe penalties inflicted on the Lido validators.
     """
-    self._assert_not_stopped()
+    assert self.operations_allowed, "contract stopped"
     self._assert_version(_expected_version)
 
     steth_rate: uint256 = self._get_rate()
@@ -231,7 +243,7 @@ def finalize_upgrade_v4():
     """
     @dev Performs state changes required for proxy upgrade from version 3 to version 4.
 
-    Can only be called by the current admin address.
+    Can only be called by the contract' admin.
     """
     self._assert_admin(msg.sender)
     self._assert_version(3)

@@ -55,13 +55,20 @@ def test_withdraw_using_actual_holders(
     accounts, steth_token, deploy_vault_and_pass_dao_vote, steth_approx_equal
 ):
     """
-    @dev Number of tokens that were burned after the incident the 2022-01-26 incident
-         caused by incorrect address encoding produced by cached UI code after onchain
-         migration to the Wormhole bridge.
-    Tx 1: 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d
-    bETH burned: 4449999990000000000
-    Tx 2: 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951
-    bETH burned: 439111118580000000000
+    @dev Due to an incident on 2022-01-26, a number of bETH tokens were effectively burned
+         by bridging to an unreachable address on Terra. These tokens are forever held by the
+         Wormhole token bridge address. The corresponding stETH tokens were later withdrawn
+         from the `AnchorVault` contract by the DAO and refunded to the original depositors.
+
+         The amount of burned bETH that was subsequently refunded is accessible by calling
+         `AnchorVault.total_beth_refunded()` function.
+
+         See: https://github.com/lidofinance/anchor-collateral-steth/pull/19
+
+         Tx 1: 0xc875f85f525d9bc47314eeb8dc13c288f0814cf06865fc70531241e21f5da09d
+         bETH burned: 4449999990000000000
+         Tx 2: 0x7abe086dd5619a577f50f87660a03ea0a1934c4022cd432ddf00734771019951
+         bETH burned: 439111118580000000000
     """
 
     #check block number for downloaded file
@@ -108,9 +115,9 @@ def test_withdraw_using_actual_holders(
     count = len(beth_holders)
     print("Total holders", len(beth_holders))
 
-    ##current version
+    # current version
     after_vault_version = vault.version()
-    assert before_vault_version != after_vault_version, "version did not increased"
+    assert before_vault_version != after_vault_version, "version is not changed"
 
     i = 0
     for holder in beth_holders:
