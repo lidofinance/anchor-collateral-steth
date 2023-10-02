@@ -1,8 +1,18 @@
 import pytest
 from brownie import ZERO_ADDRESS, Contract, reverts
 
-from test_vault import vault
+@pytest.fixture(scope='function')
+def vault(
+    AnchorVault,
+    AnchorVaultProxy,
+    deployer,
+    admin
+):
+    impl = AnchorVault.deploy({'from': deployer})
+    proxy = AnchorVaultProxy.deploy(impl, admin, {'from': deployer})
+    vault = Contract.from_abi('AnchorVault', proxy.address, AnchorVault.abi)
 
+    return vault
 
 @pytest.fixture(scope='function')
 def proxy(vault, AnchorVaultProxy):
