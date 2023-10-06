@@ -1,5 +1,5 @@
 import pytest
-from brownie import ZERO_ADDRESS, chain, interface
+from brownie import ZERO_ADDRESS, chain, interface, AnchorVault
 
 from scripts.deploy import deploy
 
@@ -252,7 +252,7 @@ def deploy_and_start_dao_vote(tx_params):
     voting = interface.Voting(lido_dao_voting_addr)
     token_manager = interface.TokenManager(lido_dao_token_manager_address)
 
-    anchor_new_vault = deploy(tx_params)
+    anchor_new_vault = AnchorVault.at('0x9530708033E7262bD7c005d0e0D47D8A9184277d')
 
     evm_script = encode_call_script([
         encode_proxy_upgrade(

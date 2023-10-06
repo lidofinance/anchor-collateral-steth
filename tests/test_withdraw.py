@@ -48,7 +48,7 @@ def test_withdraw_not_working(
     )
 
 
-@pytest.mark.skip(reason="test working only at 17965130 block")
+#@pytest.mark.skip(reason="test working only at 17965130 block")
 @pytest.mark.parametrize("rebase_coeff", [0, 1_000, -1_000])
 def test_withdraw_using_actual_holders(
     lido_oracle_report, rebase_coeff,
